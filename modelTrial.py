@@ -23,6 +23,7 @@ plot_scar_seg = False
 plot_dense_pts = False
 plot_cine_mesh = False
 plot_scar_mesh = False
+disp_scar_nodes = False
 disp_nodes = False
 gen_fe_file = False
 open_postview = False
@@ -80,11 +81,8 @@ lv_hex, lv_pent = cineMesh.getElemConMatrix()
 
 # Assign scar parameter to elements
 if scar:
-	#scar_nodes, scar_elem_centers = cineMesh.labelScarElems(heartModel.aligned_scar[time_point], conn_mat = 'hex')
-	#scar_pts = np.unique(lv_hex[scar_nodes, :])
-	#scar_nodes = np.unique(lv_hex[scar_elems, :])
 	scar_nodes, scar_elems = cineMesh.assignScarElems(heartModel.aligned_scar[time_point], conn_mat = 'hex')
-	cineMeshAxes = cineMesh.nodeRender(nodes[scar_nodes, :], ax=cineSegAxes)
+	if disp_scar_nodes: cineMeshAxes = cineMesh.nodeRender(nodes[scar_nodes, :], ax=cineSegAxes)
 	
 # Assign DENSE values to elements
 if dense:

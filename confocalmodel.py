@@ -19,8 +19,8 @@ from PIL import Image
 import os
 
 class ConfocalModel():
-"""Model class to hold confocal microscopy images and format them to generate a mesh to align with MRI data.
-"""
+	"""Model class to hold confocal microscopy images and format them to generate a mesh to align with MRI data.
+	"""
 
 	def __init__(self):
 		"""Initialize the model made to import confocal microscopy data.
