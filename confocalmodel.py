@@ -19,6 +19,8 @@ from PIL import Image
 import os
 
 class ConfocalModel():
+"""Going ahead and testing this now.
+"""
 
 	def __init__(self):
 		"""Initialize the model made to import confocal microscopy data.
