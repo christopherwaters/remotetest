@@ -33,7 +33,7 @@ heartModel = mrimodel.MRIModel(scar, dense)
 
 # Create a new instance of the Confocal Model class
 confocalModel = confocalmodel.ConfocalModel()
-#image_channels = confocalModel.splitImageChannels()
+image_channels = confocalModel.splitImageChannels()
 image_positions = confocalModel.stitchImages()
 
 # Import the cine data and do not plot the stack
