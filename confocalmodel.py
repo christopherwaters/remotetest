@@ -16,7 +16,7 @@ import numpy as np
 import matplotlib.pyplot as mplt
 import glob
 from PIL import Image
-from PIL.TiffTags import TAGS
+import exifread
 import os
 
 class ConfocalModel():
@@ -68,8 +68,12 @@ class ConfocalModel():
 	def stitchImages(self):
 		"""Stitch images together in grid, based on grid size definitions and image numbering.
 		"""
-		meta_dict = {TAGS[key] : self.raw_images[0].tag[key] for key in self.raw_images[0].tag.iterkeys()}
-		return(meta_dict)
+		with open(self.tif_files[0]) as temp_file:
+			file_lines = temp_file.readlines()
+			for line in file_lines:
+				line_split = line.split('=')
+				print(len(line_split))
+		return(tags)
 	
 	def validateIntensity(self):
 		"""Adjust image intensity based on edge intensity of adacent images.
