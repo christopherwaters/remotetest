@@ -68,11 +68,15 @@ class ConfocalModel():
 	def stitchImages(self):
 		"""Stitch images together in grid, based on grid size definitions and image numbering.
 		"""
-		with open(self.tif_files[0]) as temp_file:
+		data_categories = ['XCalibrationMicrons', 'YCalibrationMicrons', 'XLocationMicrons', 'YLocationMicrons']
+		
+		with open(self.tif_files[0], encoding='utf8', errors='ignore') as temp_file:
 			file_lines = temp_file.readlines()
-			for line in file_lines:
+			for i in range(len(file_lines)):
+				line = file_lines[i]
 				line_split = line.split('=')
-				print(len(line_split))
+				if len(line_split) == 2 and line_split[0] in data_categories:
+					print('Line: ' + line + ' Split: ' + str(len(line_split)))
 		return(tags)
 	
 	def validateIntensity(self):
