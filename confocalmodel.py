@@ -16,6 +16,7 @@ import numpy as np
 import matplotlib.pyplot as mplt
 import glob
 from PIL import Image
+from PIL.TiffTags import TAGS
 import os
 
 class ConfocalModel():
@@ -61,13 +62,14 @@ class ConfocalModel():
 				cur_channel[channel_ind] = images[image_num].getdata(channel_ind)
 			image_channels[image_num] = cur_channel
 			
-		print(image_channels)
-		return(True)
+		image_channels_arr = np.array(image_channels)
+		return(image_channels_arr)
 	
 	def stitchImages(self):
 		"""Stitch images together in grid, based on grid size definitions and image numbering.
 		"""
-		pass
+		meta_dict = {TAGS[key] : self.raw_images[0].tag[key] for key in self.raw_images[0].tag.iterkeys()}
+		return(meta_dict)
 	
 	def validateIntensity(self):
 		"""Adjust image intensity based on edge intensity of adacent images.
