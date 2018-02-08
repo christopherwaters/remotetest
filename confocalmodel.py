@@ -68,20 +68,27 @@ class ConfocalModel():
 	def stitchImages(self):
 		"""Stitch images together in grid, based on grid size definitions and image numbering.
 		"""
-		# 'XCalibrationMicrons', 'YCalibrationMicrons', 
-		data_categories = ['XLocationMicrons', 'YLocationMicrons']
-		image_positions = np.empty((len(self.tif_files), len(data_categories)))
-		for file_num, tif_file in enumerate(self.tif_files):
-			with open(tif_file, encoding='utf8', errors='ignore') as temp_file:
-				file_lines = temp_file.readlines()
-				for line in file_lines:
-					line_split = line.split('=')
-					if len(line_split) == 2:
-						if line_split[0] in data_categories:
-							image_positions[file_num, np.where(line_split[0] == data_categories)] = float(line_split[1])
+		image_positions = self._getImagePositions(self.tif_files)
 		return(image_positions)
 	
 	def validateIntensity(self):
 		"""Adjust image intensity based on edge intensity of adacent images.
 		"""
 		pass
+		
+	def _getImagePositions(self, image_files=None):
+		"""Small function to pull image position data from Volocity-exported TIF files.
+		"""
+		if not image_files:
+			image_files = self.tif_files
+		data_categories = ['XLocationMicrons', 'YLocationMicrons']
+		image_positions = np.empty((len(image_files), len(data_categories)))
+		for file_num, tif_file in enumerate(image_files):
+			with open(tif_file, encoding='utf8', errors='ignore') as temp_file:
+				file_lines = temp_file.readlines()
+				for line in file_lines:
+					line_split = line.split('=')
+					if len(line_split) == 2:
+						if line_split[0] in data_categories:
+							image_positions[file_num, data_categories.index(line_split[0])] = float(line_split[1])
+		return(image_positions)
