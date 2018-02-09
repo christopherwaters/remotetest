@@ -56,6 +56,9 @@ class modelGUI(tk.Frame):
 		tk.Button(text='Browse', command= lambda: self.openFileBrowser(dense_file_entry, multi='True')).grid(row=3, column=2)
 		tk.Button(text='Browse', command= lambda: self.openFileBrowser(confocal_dir_entry, multi='Dir')).grid(row=4, column=2)
 		
+		# Add buttons to form model components
+		tk.Button(text='Generate MRI Model', command= lambda: self.createMRIModel(sa_file_entry, la_file_entry, lge_file_entry, dense_file_entry)).grid(row=0, column=4)
+		
 	def openFileBrowser(self, entry_box, multi='False'):
 		"""Open a file browser window and assign the file name to the passed entry box.
 		"""
@@ -68,6 +71,9 @@ class modelGUI(tk.Frame):
 		entry_box.delete(0, 'end')
 		entry_box.insert(0, file_name)
 		return(file_name)
+		
+	def createMRIModel(self, sa_file_entry, la_file_entry, lge_file_entry, dense_file_entry):
+		self.mri_model = mrimodel.MRIModel(False, False)
 
 root = tk.Tk()
 gui = modelGUI(master=root)
