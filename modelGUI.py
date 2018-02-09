@@ -73,7 +73,7 @@ class modelGUI(tk.Frame):
 		return(file_name)
 		
 	def createMRIModel(self, sa_file_entry, la_file_entry, lge_file_entry, dense_file_entry):
-		self.mri_model = mrimodel.MRIModel(False, False)
+		self.mri_model = mrimodel.MRIModel(sa_file_entry.get(), la_file_entry.get(), scar_file=lge_file_entry.get(), dense_file=dense_file_entry.get())
 
 root = tk.Tk()
 gui = modelGUI(master=root)

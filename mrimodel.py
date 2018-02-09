@@ -50,7 +50,7 @@ class MRIModel():
 			Averaging occurs in the conversion to polar coordinates.
 	"""
 	
-	def __init__(self, scar=False, dense=False):
+	def __init__(self, cine_file, la_file, scar_file=None, dense_file=None):
 		"""Initialize new MRI model and select applicable files.
 		
 		Args:
@@ -58,6 +58,7 @@ class MRIModel():
 			dense: Determines whether to import a DENSE image stack.
 			
 		Returns: New instance of MRIModel
+		"""
 		"""
 		root = tk.Tk()
 		frame = tk.Frame(root)
@@ -75,12 +76,27 @@ class MRIModel():
 		else:
 			self.dense_file = None
 		root.destroy()
+		"""
+		self.cine_file = cine_file
+		self.long_axis_file = la_file
+		if scar_file:
+			self.scar_file = scar_file
+			self.scar = True
+		else:
+			self.scar_file = None
+			self.scar = False
 		
+		if dense_file:
+			self.dense_file = dense_file
+			self.dense = True
+		else:
+			self.dense_file = None
+			self.dense = False
 		# Define variables used in all models
-		self.apex_base_pts = self._importLongAxis(long_axis_file)
+		self.apex_base_pts = self._importLongAxis(self.long_axis_file)
 		
-		self.scar = scar
-		self.dense = dense
+		#self.scar = scar
+		#self.dense = dense
 		
 		self.cine_endo = []
 		self.cine_epi = []
