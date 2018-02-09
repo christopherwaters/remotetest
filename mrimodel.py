@@ -59,24 +59,6 @@ class MRIModel():
 			
 		Returns: New instance of MRIModel
 		"""
-		"""
-		root = tk.Tk()
-		frame = tk.Frame(root)
-		frame.pack()
-		
-		# Select files to use.
-		self.cine_file = filedialog.askopenfilename(title='Select Cine File:')
-		long_axis_file = filedialog.askopenfilename(title='Select Long-Axis File:')
-		if scar:
-			self.scar_file = filedialog.askopenfilename(title='Select LGE File:')
-		else:
-			self.scar_file = None
-		if dense:
-			self.dense_file = filedialog.askopenfilenames(title='Select DENSE File:')
-		else:
-			self.dense_file = None
-		root.destroy()
-		"""
 		self.cine_file = cine_file
 		self.long_axis_file = la_file
 		if scar_file:
@@ -92,11 +74,9 @@ class MRIModel():
 		else:
 			self.dense_file = None
 			self.dense = False
+		
 		# Define variables used in all models
 		self.apex_base_pts = self._importLongAxis(self.long_axis_file)
-		
-		#self.scar = scar
-		#self.dense = dense
 		
 		self.cine_endo = []
 		self.cine_epi = []

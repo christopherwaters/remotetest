@@ -26,6 +26,9 @@ class modelGUI(tk.Frame):
 		master.rowconfigure(2, pad=5)
 		master.rowconfigure(3, pad=5)
 		master.rowconfigure(4, pad=5)
+		
+		# On window close by user
+		master.protocol('WM_DELETE_WINDOW', self.destroy())
 
 	def createWidgets(self):
 		# Create Entry object
@@ -77,5 +80,5 @@ class modelGUI(tk.Frame):
 
 root = tk.Tk()
 gui = modelGUI(master=root)
+gui.master.title('Cardiac Modeling Toolbox')
 gui.mainloop()
-root.destroy()
