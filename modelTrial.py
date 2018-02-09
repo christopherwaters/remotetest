@@ -9,7 +9,6 @@ Created on Thu Jul 27 11:56:22 2017
 import mrimodel
 import mesh
 import confocalmodel
-import numpy as np
 import time
 
 # Define import variables
