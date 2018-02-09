@@ -16,7 +16,6 @@ import numpy as np
 import matplotlib.pyplot as mplt
 import glob
 from PIL import Image
-import exifread
 import os
 
 class ConfocalModel():
@@ -65,7 +64,7 @@ class ConfocalModel():
 		image_channels_arr = np.array(image_channels)
 		return(image_channels_arr)
 	
-	def stitchImages(self, images=None):
+	def stitchImages(self, images=None, overlap=0.1):
 		"""Stitch images together in grid, based on grid size definitions and image numbering.
 		"""
 		if not images:
@@ -80,6 +79,11 @@ class ConfocalModel():
 			x_slot = np.where(x_slots == image_positions[image_num, column_dict['XLocationMicrons']])[0]
 			y_slot = np.where(y_slots == image_positions[image_num, column_dict['YLocationMicrons']])[0]
 			image_grid[x_slot, y_slot] = image_num
+		# Get the size in pixel count for the images
+		image_x, image_y = images[0].size
+		image_z = images[0].n_frames
+		image_size = [image_x, image_y, image_z]
+		print(image_size)
 		return(image_grid)
 	
 	def validateIntensity(self):
