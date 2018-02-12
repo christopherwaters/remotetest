@@ -138,7 +138,10 @@ class modelGUI(tk.Frame):
 	def createMRIModel(self, sa_filename, la_filename, lge_filename, dense_filenames, cine_timepoint_cbox):
 		# Create model, import initial cine stack
 		self.progLabel['text'] = 'Generating MRI Model'
-		self.mri_model = mrimodel.MRIModel(sa_filename.get(), la_filename.get(), scar_file=lge_filename.get(), dense_file=dense_filenames.get())
+		dense_filenames_parsed = dense_filenames.get().split('} {')
+		list_replacements = {ord('{') : None, ord('}') : None}
+		dense_filenames_replaced = [temp_str.translate(list_replacements) for temp_str in dense_filenames_parsed]
+		self.mri_model = mrimodel.MRIModel(sa_filename.get(), la_filename.get(), scar_file=lge_filename.get(), dense_file=dense_filenames_replaced)
 		self.progLabel['text'] = 'Importing Cine Stack'
 		self.mri_model.importCine(timepoint=0)
 		# Import LGE, if included, and generate full alignment array
@@ -153,7 +156,7 @@ class modelGUI(tk.Frame):
 		if self.mri_model.dense:
 			self.progLabel['text'] = 'Importing DENSE Stack'
 			self.mri_model.importDense()
-			self.mri_model.alignDense(align_timepoint=0)
+			self.mri_model.alignDense(cine_timepoint=0)
 		# Update GUI elements
 		cine_timepoint_cbox.configure(values=list(range(len(self.mri_model.cine_endo))), state='readonly')
 		cine_timepoint_cbox.current(0)
@@ -174,7 +177,7 @@ class modelGUI(tk.Frame):
 			return(False)
 		self.mri_model.importCine(timepoint = new_timepoint)
 		if self.mri_model.dense:
-			self.mri_model.alignDense(align_timepoint = new_timepoint)
+			self.mri_model.alignDense(cine_timepoint = new_timepoint)
 		self.progLabel.configure(text='Timepoint successfully updated!')
 			
 root = tk.Tk()

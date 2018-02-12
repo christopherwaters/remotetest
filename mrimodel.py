@@ -204,9 +204,6 @@ class MRIModel():
 		
 	def importDense(self):
 		"""Imports DENSE MR data.
-		
-		Currently this has no functionality, must be implemented.
-		
 		"""
 		
 		dense_endo = [None]*len(self.dense_file)
