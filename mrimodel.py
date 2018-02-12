@@ -202,7 +202,7 @@ class MRIModel():
 		
 		return(True)
 		
-	def importDense(self, align_timepoint=0):
+	def importDense(self):
 		"""Imports DENSE MR data.
 		
 		Currently this has no functionality, must be implemented.
@@ -237,16 +237,16 @@ class MRIModel():
 			epi_interp = epi_interp_func(np.arange(0, 80/79, 1/79))
 		
 			# Find nearest slice in cine stack
-			cine_endo_slices = np.unique(self.cine_endo[align_timepoint][:, 2])
-			cine_epi_slices = np.unique(self.cine_epi[align_timepoint][:, 2])
-			cine_endo_slice_match = cine_endo_slices[np.where(abs(cine_endo_slices - slice_location) == np.min(abs(cine_endo_slices - slice_location)))[0][0]]
-			cine_epi_slice_match = cine_epi_slices[np.where(abs(cine_epi_slices - slice_location) == np.min(abs(cine_epi_slices - slice_location)))[0][0]]
-			cine_endo_slice_inds = np.where(self.cine_endo[align_timepoint][:, 2] == cine_endo_slice_match)[0]
-			cine_epi_slice_inds = np.where(self.cine_epi[align_timepoint][:, 2] == cine_epi_slice_match)[0]
+			#cine_endo_slices = np.unique(self.cine_endo[align_timepoint][:, 2])
+			#cine_epi_slices = np.unique(self.cine_epi[align_timepoint][:, 2])
+			#cine_endo_slice_match = cine_endo_slices[np.where(abs(cine_endo_slices - slice_location) == np.min(abs(cine_endo_slices - slice_location)))[0][0]]
+			#cine_epi_slice_match = cine_epi_slices[np.where(abs(cine_epi_slices - slice_location) == np.min(abs(cine_epi_slices - slice_location)))[0][0]]
+			#cine_endo_slice_inds = np.where(self.cine_endo[align_timepoint][:, 2] == cine_endo_slice_match)[0]
+			#cine_epi_slice_inds = np.where(self.cine_epi[align_timepoint][:, 2] == cine_epi_slice_match)[0]
 			
 			# Get endo and epi traces
-			cine_slice_endo = self.cine_endo[align_timepoint][cine_endo_slice_inds, :]
-			cine_slice_epi = self.cine_epi[align_timepoint][cine_endo_slice_inds, :]
+			#cine_slice_endo = self.cine_endo[align_timepoint][cine_endo_slice_inds, :]
+			#cine_slice_epi = self.cine_epi[align_timepoint][cine_endo_slice_inds, :]
 			
 			# Pull timepoints from DENSE
 			dense_timepoints = len(dense_data['DisplacementInfo']['dX'][0])
@@ -259,8 +259,8 @@ class MRIModel():
 			dense_endo[i] = endo_shift
 			dense_epi[i] = epi_shift
 			
-			cine_endo_theta, cine_endo_rho = self._cartToPol(cine_slice_endo[:, 0], cine_slice_endo[:, 1])
-			cine_epi_theta, cine_epi_rho = self._cartToPol(cine_slice_epi[:, 0], cine_slice_epi[:, 1])
+			#cine_endo_theta, cine_endo_rho = self._cartToPol(cine_slice_endo[:, 0], cine_slice_endo[:, 1])
+			#cine_epi_theta, cine_epi_rho = self._cartToPol(cine_slice_epi[:, 0], cine_slice_epi[:, 1])
 			
 			# Shift the entire pixel array by the same epicardial mean
 			dense_x = dense_data['DisplacementInfo']['X'] - np.mean(epi_interp[:, 0])
@@ -1225,8 +1225,6 @@ class MRIModel():
 		
 	def alignScarCine(self, timepoint=0):
 		"""One of the attempts to align the scar and cine meshes.
-		
-		This function currently does nothing and acts as a placeholder.
 		"""
 		# If a timepoint is passed, pull the cine from that point
 		cine_endo = self.cine_endo[timepoint]
