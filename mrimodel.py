@@ -1417,8 +1417,6 @@ class MRIModel():
 			cine_endo_slice = cine_endo_timepoint[slice_in_cine, :] - np.mean(cine_epi_timepoint[slice_in_cine, :], axis=0)
 			cine_epi_slice = cine_epi_timepoint[slice_in_cine, :] - np.mean(cine_epi_timepoint[slice_in_cine, :], axis=0)
 			
-			#print(np.mean(cine_epi_timepoint[slice_in_cine, :]))
-			
 			# Convert both sets of slices to polar
 			dense_endo_theta, dense_endo_rho = self._cartToPol(dense_slice_endo[:, 0], dense_slice_endo[:, 1])
 			dense_epi_theta, dense_epi_rho = self._cartToPol(dense_slice_epi[:, 0], dense_slice_epi[:, 1])
