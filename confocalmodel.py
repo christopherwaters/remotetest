@@ -33,7 +33,7 @@ class ConfocalModel():
 		confocal_folder = filedialog.askdirectory(title='Select confocal microscopy folder.')
 		root.destroy()
 		
-		# Get all TIFF files in the 
+		# Get all TIFF files in the directory
 		self.tif_files = glob.glob(os.path.join(confocal_folder, '*.tif'))
 		self.raw_images = [None]*len(self.tif_files)
 		
