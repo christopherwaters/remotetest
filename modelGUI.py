@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
 from tkinter import font
+from tkinter import messagebox
 import warnings
 import mrimodel
 import confocalmodel
@@ -42,7 +43,6 @@ class modelGUI(tk.Frame):
 		lge_filename = tk.StringVar()
 		dense_filenames = tk.StringVar()
 		confocal_dir = tk.StringVar()
-		cine_time_opts = ['N/A']
 		self.scar_plot_bool = tk.IntVar(value=0)
 		self.dense_plot_bool = tk.IntVar(value=0)
 
@@ -54,8 +54,7 @@ class modelGUI(tk.Frame):
 		confocal_dir_entry = ttk.Entry(width=80, textvariable=confocal_dir)
 		
 		# Creat Combobox objects for timepoints
-		cine_timepoint_cbox = ttk.Combobox(values=cine_time_opts, state='disabled', width=5)
-		cine_timepoint_cbox.current(0)
+		self.cine_timepoint_cbox = ttk.Combobox(state='disabled', width=5)
 		self.dense_timepoint_cbox = ttk.Combobox(state='disabled', width=5)
 		
 		# Create Entry objects for mesh settings
@@ -72,7 +71,7 @@ class modelGUI(tk.Frame):
 		self.dense_cbutton.grid(row=10, column=1, sticky='W')
 		
 		# Settings for combobox selections
-		cine_timepoint_cbox.bind('<<ComboboxSelected>>', lambda _ : self.cineTimeChanged(cine_timepoint_cbox))
+		self.cine_timepoint_cbox.bind('<<ComboboxSelected>>', lambda _ : self.cineTimeChanged())
 		
 		# Grid placement of separators
 		ttk.Separator(orient='vertical').grid(column=9, row=0, rowspan=7, sticky='NS')
@@ -115,7 +114,7 @@ class modelGUI(tk.Frame):
 		lge_file_entry.grid(row=3, column=1, columnspan=5)
 		dense_file_entry.grid(row=4, column=1, columnspan=5)
 		confocal_dir_entry.grid(row=5, column=1, columnspan=5)
-		cine_timepoint_cbox.grid(row=1, column=8)
+		self.cine_timepoint_cbox.grid(row=1, column=8)
 		num_rings_entry.grid(row=1, column=11)
 		elem_per_ring_entry.grid(row=2, column=11)
 		elem_thru_wall_entry.grid(row=3, column=11)
@@ -136,13 +135,25 @@ class modelGUI(tk.Frame):
 		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(confocal_dir_entry, multi='Dir')).grid(row=5, column=6)
 		
 		# Add buttons to form model components
-		ttk.Button(text='Generate MRI Model', command= lambda: self.createMRIModel(sa_filename, la_filename, lge_filename, dense_filenames, cine_timepoint_cbox)).grid(row=2, column=7, columnspan=2)
-		self.meshButton = ttk.Button(text='Generate Model First', state='disabled', command= lambda: self.createMRIMesh(cine_timepoint_cbox, num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox))
+		ttk.Button(text='Generate MRI Model', command= lambda: self.createMRIModel(sa_filename, la_filename, lge_filename, dense_filenames)).grid(row=2, column=7, columnspan=2)
+		self.meshButton = ttk.Button(text='Generate Model First', state='disabled', command= lambda: self.createMRIMesh(num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox))
 		self.meshButton.grid(row=5, column=10, columnspan=2)
 		
 		# Add buttons to plot model
-		self.plot_button = ttk.Button(text='Plot MRI Model', command= lambda: self.plotMRIModel(cine_timepoint_cbox), state='disabled')
-		self.plot_button.grid(row=12, column=0, columnspan=1)
+		self.plot_mri_button = ttk.Button(text='Plot MRI Model', command= lambda: self.plotMRIModel(), state='disabled')
+		self.plot_mri_button.grid(row=12, column=0, sticky='W')
+		self.plot_mesh_button = ttk.Button(text='Plot MRI Mesh', command= lambda: self.plotMRIMesh(), state='disabled')
+		self.plot_mesh_button.grid(row=12, column=1, sticky='W')
+		
+		# Add mesh options (post-creation adjustments)
+		self.conn_mat_cbox = ttk.Combobox(state='disabled', values=['hex', 'pent'], width=10)
+		self.conn_mat_cbox.current(0)
+		self.conn_mat_cbox.grid(row=9, column=11)
+		ttk.Label(text='Select conn matrix:').grid(row=9, column=10, sticky='W')
+		self.scar_fe_button = ttk.Button(text='Identify scar nodes', state='disabled', command= lambda: self.scarElem())
+		self.scar_fe_button.grid(row=10, column=10, columnspan=2)
+		self.dense_fe_button = ttk.Button(text='Assign element displacements', state='disabled', command= lambda: self.denseElem())
+		self.dense_fe_button.grid(row=11, column=10, columnspan=2)
 		
 	def openFileBrowser(self, entry_box, multi='False'):
 		"""Open a file browser window and assign the file name to the passed entry box.
@@ -157,7 +168,7 @@ class modelGUI(tk.Frame):
 		entry_box.insert(0, file_name)
 		return(file_name)
 		
-	def createMRIModel(self, sa_filename, la_filename, lge_filename, dense_filenames, cine_timepoint_cbox):
+	def createMRIModel(self, sa_filename, la_filename, lge_filename, dense_filenames):
 		# Create model, import initial cine stack
 		if sa_filename.get() == '' or la_filename.get() == '':
 			self.progLabel['text'] = 'Please select long-axis and short-axis files first'
@@ -187,27 +198,43 @@ class modelGUI(tk.Frame):
 			self.progLabel['text'] = 'Importing DENSE Stack'
 			self.mri_model.importDense()
 			self.mri_model.alignDense(cine_timepoint=0)
-			self.dense_timepoint_cbox.configure(values=list(range(len(self.mri_model.dense_aligned_displacement))), state='normal')
+			self.dense_timepoint_cbox.configure(values=list(range(len(self.mri_model.dense_aligned_displacement))), state='readonly')
 			self.dense_timepoint_cbox.current(0)
 		# Update GUI elements
-		cine_timepoint_cbox.configure(values=list(range(len(self.mri_model.cine_endo))), state='readonly')
-		cine_timepoint_cbox.current(0)
+		self.cine_timepoint_cbox.configure(values=list(range(len(self.mri_model.cine_endo))), state='readonly')
+		self.cine_timepoint_cbox.current(0)
 		self.progLabel['text'] = 'MRI Model Generated Successfully'
 		self.meshButton.configure(state='normal', text='Generate MRI Mesh')
 
-	def createMRIMesh(self, cine_timepoint_cbox, num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox):
+	def createMRIMesh(self, num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox):
+		# Pull variables from GUI entry fields
 		num_rings = int(num_rings_entry.get())
 		elem_per_ring = int(elem_per_ring_entry.get())
 		elem_in_wall = int(elem_thru_wall_entry.get())
+		time_point = int(self.cine_timepoint_cbox.get())
+		
+		# Create base mesh
 		self.mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
-		time_point = int(cine_timepoint_cbox.get())
-		cine_endo_mat, cine_epi_mat = self.mri_mesh.fitContours(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, mesh_type_cbox.get())
-		self.plot_button.configure(state='normal')
+		
+		# Fill out mesh components and fields from model
+		self.mri_mesh.fitContours(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, mesh_type_cbox.get())
+		self.mri_mesh.feMeshRender()
+		self.mri_mesh.nodeNum(self.mri_mesh.meshCart[0], self.mri_mesh.meshCart[1], self.mri_mesh.meshCart[2])
+		self.mri_mesh.getElemConMatrix()
+		
+		# Update GUI elements
+		self.plot_mri_button.configure(state='normal')
+		self.plot_mesh_button.configure(state='normal')
+		self.conn_mat_cbox.configure(state='readonly')
+		if self.mri_model.scar:
+			self.scar_fe_button.configure(state='normal')
+		if self.mri_model.dense:
+			self.dense_fe_button.configure(state='normal')
 	
-	def cineTimeChanged(self, cine_timepoint_cbox):
+	def cineTimeChanged(self):
 		self.progLabel.configure(text='Updating timepoint in model.')
 		try:
-			new_timepoint = int(cine_timepoint_cbox.get())
+			new_timepoint = int(self.cine_timepoint_cbox.get())
 		except:
 			self.progLabel.configure(text='Timepoint selection failed. Probably a NaN timepoint.')
 			return(False)
@@ -216,13 +243,29 @@ class modelGUI(tk.Frame):
 			self.mri_model.alignDense(cine_timepoint = new_timepoint)
 		self.progLabel.configure(text='Timepoint successfully updated!')
 	
-	def plotMRIModel(self, cine_timepoint_cbox):
-		time_point = int(cine_timepoint_cbox.get())
+	def plotMRIModel(self):
+		time_point = int(self.cine_timepoint_cbox.get())
 		mri_axes = self.mri_mesh.segmentRender(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts)
 		if self.scar_plot_bool.get():
 			mri_axes = self.mri_mesh.displayScarTrace(self.mri_model.aligned_scar[time_point], ax=mri_axes)
 		if self.dense_plot_bool.get():
 			mri_axes = self.mri_mesh.displayDensePts(self.mri_model.dense_aligned_pts, self.mri_model.dense_slices, self.mri_model.dense_aligned_displacement, dense_plot_quiver=1, timepoint=int(self.dense_timepoint_cbox.get()), ax=mri_axes)
+	
+	def plotMRIMesh(self):
+		mesh_axes = self.mri_mesh.surfaceRender(self.mri_mesh.endo_node_matrix)
+		mesh_axes = self.mri_mesh.surfaceRender(self.mri_mesh.epi_node_matrix, mesh_axes)
+		if self.scar_plot_bool.get() and self.mri_mesh.nodes_in_scar.size:
+			mesh_axes = self.mri_mesh.nodeRender(self.mri_mesh.nodes[self.mri_mesh.nodes_in_scar, :], ax=mesh_axes)
+		elif self.scar_plot_bool.get() and not self.mri_mesh.nodes_in_scar.size:
+			messagebox.showinfo('Warning', 'Identify scar nodes before plotting to view.')
+	
+	def scarElem(self):
+		time_point = int(self.cine_timepoint_cbox.get())
+		self.mri_mesh.assignScarElems(self.mri_model.aligned_scar[time_point], conn_mat = self.conn_mat_cbox.get())
+	
+	def denseElem(self):
+		time_point = int(self.cine_timepoint_cbox.get())
+		self.mri_mesh.assignDenseElems(self.mri_model.dense_aligned_pts, self.mri_model.dense_slices, self.mri_model.dense_aligned_displacement)
 	
 	def intValidate(self, new_value):
 		if new_value == '':

@@ -66,6 +66,8 @@ class Mesh():
 		self.scar_elems = []
 		self.dense_x_displacements = []
 		self.dense_y_displacements = []
+		self.nodes_in_scar = np.array([])
+		self.elems_in_scar = np.array([])
 	
 	def fitContours(self, all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, mesh_type):
 		"""Function to Perform the Contour Fitting from the Passed Endo and Epi Contour data.
@@ -375,10 +377,10 @@ class Mesh():
 		p = np.rot90(p)
 		
 		# Define the return matrices
-		meshCart = [x, y, z]
-		meshProl = [m, n, p]
+		self.meshCart = [x, y, z]
+		self.meshProl = [m, n, p]
 		
-		return([meshCart, meshProl])
+		return([self.meshCart, self.meshProl])
 	
 	def nodeNum(self, x, y, z):
 		"""Generate node corners as x, y, z points
@@ -599,17 +601,17 @@ class Mesh():
 		scar_vstack = np.vstack(tuple(scar_contour))
 		scar_vstack = np.dot((scar_vstack - np.array([self.origin for i in range(scar_vstack.shape[0])])), np.transpose(self.transform))
 		
-		nodes_in_scar = self._assignRegionNodes(scar_vstack, scar_edge_spacing, num_slices)
+		self.nodes_in_scar = self._assignRegionNodes(scar_vstack, scar_edge_spacing, num_slices)
 		
 		# Get connectivity matrix
 		elem_con = self.pent if conn_mat == 'pent' else self.hex
 		
 		# Determine number of nodes in scar region for each element
-		elem_scar_mask = np.reshape(np.in1d(elem_con, nodes_in_scar), elem_con.shape)
+		elem_scar_mask = np.reshape(np.in1d(elem_con, self.nodes_in_scar), elem_con.shape)
 		elem_node_ct = np.sum(elem_scar_mask, axis=1)
-		elems_in_scar = np.where(elem_node_ct >= num_nodes)[0]
+		self.elems_in_scar = np.where(elem_node_ct >= num_nodes)[0]
 		
-		return([nodes_in_scar, elems_in_scar])
+		return([self.nodes_in_scar, self.elems_in_scar])
 	
 	def assignDenseElems(self, dense_pts, dense_slices, dense_displacement_all, conn_mat='hex'):
 		"""Assign DENSE dx and dy values to elements within the field.
