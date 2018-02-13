@@ -37,6 +37,8 @@ class modelGUI(tk.Frame):
 		master.protocol('WM_DELETE_WINDOW', self.destroy())
 
 	def createWidgets(self):
+		"""Place widgets throughout GUI frame and assign functionality.
+		"""
 		# Establish tk variables
 		sa_filename = tk.StringVar()
 		la_filename = tk.StringVar()
@@ -175,6 +177,7 @@ class modelGUI(tk.Frame):
 		
 	def openFileBrowser(self, entry_box, multi='False'):
 		"""Open a file browser window and assign the file name to the passed entry box.
+		Allows various options for type of file browser to be launched.
 		"""
 		if multi == 'True':
 			file_name = filedialog.askopenfilenames(title='Select Files')
@@ -191,10 +194,17 @@ class modelGUI(tk.Frame):
 		return(file_name)
 		
 	def createMRIModel(self, sa_filename, la_filename, lge_filename, dense_filenames):
-		# Create model, import initial cine stack
+		"""Function run to instantiate MRI model based on input files.
+		"""
+		# Check that required files are present
 		if sa_filename.get() == '' or la_filename.get() == '':
-			self.progLabel['text'] = 'Please select long-axis and short-axis files first'
+			if sa_filename.get() == '':
+				messagebox.showinfo('File Error', 'Need Short-Axis file.')
+			elif la_filename.get() == '':
+				messagebox.showinfo('File Error', 'Need Long-Axis file.')
 			return(False)
+		
+		# Parse DENSE Filenames
 		self.progLabel['text'] = 'Generating MRI Model'
 		if not(dense_filenames.get() == ''):
 			dense_filenames_parsed = dense_filenames.get().split('} {')
@@ -202,18 +212,27 @@ class modelGUI(tk.Frame):
 			dense_filenames_replaced = [temp_str.translate(list_replacements) for temp_str in dense_filenames_parsed]
 		else:
 			dense_filenames_replaced = dense_filenames.get()
+		
+		# Instantiate MRI model object and import cine stack (at default timepoint)
 		self.mri_model = mrimodel.MRIModel(sa_filename.get(), la_filename.get(), scar_file=lge_filename.get(), dense_file=dense_filenames_replaced)
 		self.progLabel['text'] = 'Importing Cine Stack'
 		self.mri_model.importCine(timepoint=0)
+		
 		# Import LGE, if included, and generate full alignment array
 		if self.mri_model.scar:
 			self.scar_cbutton.configure(state='normal')
 			self.progLabel['text'] = 'Importing Scar Stack'
 			self.mri_model.importLGE()
+			# Run scar alignment for all timepoints at start, to store before use
 			with warnings.catch_warnings():
 				warnings.simplefilter('ignore')
 				for i in range(len(self.mri_model.cine_endo)):
 					self.mri_model.alignScarCine(timepoint=i)
+		else:
+			# Only occurs if scar is removed from MRI model on later instantiation
+			self.scar_cbutton.configure(state='disabled')
+			self.scar_fe_button.configure(state='disabled')
+		
 		# Import DENSE, if included
 		if self.mri_model.dense:
 			self.dense_cbutton.configure(state='normal')
@@ -222,6 +241,12 @@ class modelGUI(tk.Frame):
 			self.mri_model.alignDense(cine_timepoint=0)
 			self.dense_timepoint_cbox.configure(values=list(range(len(self.mri_model.dense_aligned_displacement))), state='readonly')
 			self.dense_timepoint_cbox.current(0)
+		else:
+			# Only occurs if DENSE is removed from MRI model on later instantiation
+			self.dense_cbutton.configure(state='disabled')
+			self.dense_timepoint_cbox.configure(values=[], state='disabled')
+			self.dense_fe_button.configure(state='disabled')
+		
 		# Update GUI elements
 		self.cine_timepoint_cbox.configure(values=list(range(len(self.mri_model.cine_endo))), state='readonly')
 		self.cine_timepoint_cbox.current(0)
@@ -229,22 +254,28 @@ class modelGUI(tk.Frame):
 		self.meshButton.configure(state='normal', text='Generate MRI Mesh')
 
 	def createMRIMesh(self, num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox):
+		"""Function to generate base-level mesh from MRI model object
+		"""
 		# Pull variables from GUI entry fields
-		num_rings = int(num_rings_entry.get())
-		elem_per_ring = int(elem_per_ring_entry.get())
-		elem_in_wall = int(elem_thru_wall_entry.get())
+		if not (num_rings_entry.get() == '' or elem_per_ring_entry.get() == '' or elem_thru_wall_entry.get() == ''):
+			num_rings = int(num_rings_entry.get())
+			elem_per_ring = int(elem_per_ring_entry.get())
+			elem_in_wall = int(elem_thru_wall_entry.get())
+		else:
+			messagebox.showinfo('Mesh Settings', 'Mesh option left blank. Correct and try again.')
+			return(False)
 		time_point = int(self.cine_timepoint_cbox.get())
 		
 		# Create base mesh
 		self.mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
 		
-		# Fill out mesh components and fields from model
+		# Fit mesh to MRI model data
 		self.mri_mesh.fitContours(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, mesh_type_cbox.get())
 		self.mri_mesh.feMeshRender()
 		self.mri_mesh.nodeNum(self.mri_mesh.meshCart[0], self.mri_mesh.meshCart[1], self.mri_mesh.meshCart[2])
 		self.mri_mesh.getElemConMatrix()
 		
-		# Update GUI elements
+		# Update GUI elements as needed
 		self.plot_mri_button.configure(state='normal')
 		self.plot_mesh_button.configure(state='normal')
 		self.feb_file_button.configure(state='normal')
@@ -252,64 +283,113 @@ class modelGUI(tk.Frame):
 		self.conn_mat_cbox.configure(state='readonly')
 		if self.mri_model.scar:
 			self.scar_fe_button.configure(state='normal')
+		else:
+			self.scar_fe_button.configure(state='disabled')
 		if self.mri_model.dense:
 			self.dense_fe_button.configure(state='normal')
+		else:
+			self.dense_fe_button.configure(state='disabled')
 	
 	def cineTimeChanged(self):
+		"""Function to respond to timepoint adjustments in the base cine mesh / model
+		"""
+		# Insure timepoint is an integer (should always succeed, in place for possible errors)
 		self.progLabel.configure(text='Updating timepoint in model.')
 		try:
 			new_timepoint = int(self.cine_timepoint_cbox.get())
 		except:
 			self.progLabel.configure(text='Timepoint selection failed. Probably a NaN timepoint.')
 			return(False)
+		# Import the cine model at the selected timepoint (updates landmarks)
 		self.mri_model.importCine(timepoint = new_timepoint)
+		# If necessary, align DENSE to new cine timepoint (most important aspect)
 		if self.mri_model.dense:
 			self.mri_model.alignDense(cine_timepoint = new_timepoint)
 		self.progLabel.configure(text='Timepoint successfully updated!')
 	
 	def plotMRIModel(self):
+		"""Plots MRI Model based on raw data (slice contours, scar traces, etc.)
+		"""
+		# Pull timepoint from timepoint selection combobox
 		time_point = int(self.cine_timepoint_cbox.get())
+		# Plot overall cine segmentation data
 		mri_axes = self.mri_mesh.segmentRender(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts)
-		if self.scar_plot_bool.get():
+		# If desired, plot scar data
+		if self.scar_plot_bool.get() and self.mri_model.scar:
 			mri_axes = self.mri_mesh.displayScarTrace(self.mri_model.aligned_scar[time_point], ax=mri_axes)
-		if self.dense_plot_bool.get():
+		# If desired, plot DENSE data
+		if self.dense_plot_bool.get() and self.mri_model.dense:
 			mri_axes = self.mri_mesh.displayDensePts(self.mri_model.dense_aligned_pts, self.mri_model.dense_slices, self.mri_model.dense_aligned_displacement, dense_plot_quiver=1, timepoint=int(self.dense_timepoint_cbox.get()), ax=mri_axes)
 	
 	def plotMRIMesh(self):
+		"""Plots the mesh data as a surface plot, with display options
+		"""
+		# Plot surface contours of endocardium and epicardium
 		mesh_axes = self.mri_mesh.surfaceRender(self.mri_mesh.endo_node_matrix)
 		mesh_axes = self.mri_mesh.surfaceRender(self.mri_mesh.epi_node_matrix, mesh_axes)
+		# Display node positions, if selected
 		if self.nodes_plot_bool.get():
 			mesh_axes = self.mri_mesh.nodeRender(self.mri_mesh.nodes, mesh_axes)
+		# Display scar locations, if available and desired
 		if self.scar_plot_bool.get() and self.mri_mesh.nodes_in_scar.size:
 			mesh_axes = self.mri_mesh.nodeRender(self.mri_mesh.nodes[self.mri_mesh.nodes_in_scar, :], ax=mesh_axes)
 		elif self.scar_plot_bool.get() and not self.mri_mesh.nodes_in_scar.size:
+			# Warn if scar box selected, but elements unidentified.
 			messagebox.showinfo('Warning', 'Identify scar nodes before plotting to view.')
 	
 	def scarElem(self):
+		"""Requests mesh to process which elements are in scar
+		"""
 		time_point = int(self.cine_timepoint_cbox.get())
 		self.mri_mesh.assignScarElems(self.mri_model.aligned_scar[time_point], conn_mat = self.conn_mat_cbox.get())
 	
 	def denseElem(self):
+		"""Requests mesh to assign DENSE information to all applicable elements
+		"""
 		time_point = int(self.cine_timepoint_cbox.get())
 		self.mri_mesh.assignDenseElems(self.mri_model.dense_aligned_pts, self.mri_model.dense_slices, self.mri_model.dense_aligned_displacement)
 	
 	def genFebFile(self):
+		"""Generate FEBio file in indicated location
+		"""
+		# Perform filename checks to ensure proper filename entered.
 		feb_file_name = self.postview_file_entry.get()
+		if feb_file_name == '':
+			messagebox.showinfo('Filename Error', 'File name is not indicated.')
+			return(False)
+		elif not (feb_file_name.split('.')[-1] == 'feb'):
+			messagebox.showinfo('Filename Error', 'File must be an FEBio file (*.feb).')
+			return(False)
+		# Generate FEBio file through Mesh function
 		self.mri_mesh.generateFEFile(feb_file_name, self.conn_mat_cbox.get())
+		# Update GUI Elements
 		self.postview_open_button.configure(state='normal')
 		
 	def openPostview(self):
+		"""Launch a PostView instance pointed at the FEBio File
+		"""
+		# Pull FEBio file name
 		feb_file_name = self.postview_file_entry.get()
+		# Check that file is an accessible file
 		try:
 			open(feb_file_name)
 		except:
 			messagebox.showinfo('File Warning', 'FEBio File not found. Check file name and try again.')
 			return(False)
+		# Ensure that file is an FEBio file
+		if not (feb_file_name.split('.')[-1] == 'feb'):
+			messagebox.showinfo('File Warning', 'File selected is not an FEBio file. Check file name and try again.')
+			return(False)
+		# Request PostView Launch
 		self.mri_mesh.displayMeshPostview(feb_file_name)
 	
 	def intValidate(self, new_value):
+		"""Simple validation function to ensure an entry receives only int-able inputs or null
+		"""
+		# Accept empty entry box to allow clearing the box
 		if new_value == '':
 			return(True)
+		# Attempt integer conversion. If possible, accept new input
 		try:
 			int(new_value)
 			return(True)
