@@ -56,6 +56,7 @@ class modelGUI(tk.Frame):
 		# Creat Combobox objects for timepoints
 		cine_timepoint_cbox = ttk.Combobox(values=cine_time_opts, state='disabled', width=5)
 		cine_timepoint_cbox.current(0)
+		self.dense_timepoint_cbox = ttk.Combobox(state='disabled', width=5)
 		
 		# Create Entry objects for mesh settings
 		num_rings_entry = ttk.Entry(width=10)
@@ -65,10 +66,10 @@ class modelGUI(tk.Frame):
 		mesh_type_cbox.current(0)
 		
 		# Create checkboxes for plot options
-		self.scar_cbutton = ttk.Checkbutton(variable = self.scar_plot_bool)
-		self.dense_cbutton = ttk.Checkbutton(variable = self.dense_plot_bool)
-		self.scar_cbutton.grid(row=9, column=0, sticky='E')
-		self.dense_cbutton.grid(row=10, column=0, sticky='E')
+		self.scar_cbutton = ttk.Checkbutton(variable = self.scar_plot_bool, state='disabled')
+		self.dense_cbutton = ttk.Checkbutton(variable = self.dense_plot_bool, state='disabled')
+		self.scar_cbutton.grid(row=9, column=1, sticky='W')
+		self.dense_cbutton.grid(row=10, column=1, sticky='W')
 		
 		# Settings for combobox selections
 		cine_timepoint_cbox.bind('<<ComboboxSelected>>', lambda _ : self.cineTimeChanged(cine_timepoint_cbox))
@@ -100,6 +101,7 @@ class modelGUI(tk.Frame):
 		#   Plot setting labels
 		ttk.Label(text='Plot Scar?').grid(row=9, column=0, sticky='W')
 		ttk.Label(text='Plot DENSE?').grid(row=10, column=0, sticky='W')
+		ttk.Label(text='DENSE Timepoint:').grid(row=11, column=0, sticky='W')
 		
 		# Set specific label fonts
 		f = font.Font(meshLabel, meshLabel.cget('font'))
@@ -124,6 +126,7 @@ class modelGUI(tk.Frame):
 		elem_per_ring_entry.configure(validate='key', validatecommand=(num_rings_entry.register(self.intValidate), '%P'))
 		elem_thru_wall_entry.configure(validate='key', validatecommand=(num_rings_entry.register(self.intValidate), '%P'))
 		mesh_type_cbox.grid(row=4, column=11)
+		self.dense_timepoint_cbox.grid(row=11, column=1, sticky='W')
 		
 		# Add browse buttons for file exploration, to pass to entry boxes
 		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(sa_file_entry)).grid(row=1, column=6)
@@ -136,6 +139,10 @@ class modelGUI(tk.Frame):
 		ttk.Button(text='Generate MRI Model', command= lambda: self.createMRIModel(sa_filename, la_filename, lge_filename, dense_filenames, cine_timepoint_cbox)).grid(row=2, column=7, columnspan=2)
 		self.meshButton = ttk.Button(text='Generate Model First', state='disabled', command= lambda: self.createMRIMesh(cine_timepoint_cbox, num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox))
 		self.meshButton.grid(row=5, column=10, columnspan=2)
+		
+		# Add buttons to plot model
+		self.plot_button = ttk.Button(text='Plot MRI Model', command= lambda: self.plotMRIModel(cine_timepoint_cbox), state='disabled')
+		self.plot_button.grid(row=12, column=0, columnspan=1)
 		
 	def openFileBrowser(self, entry_box, multi='False'):
 		"""Open a file browser window and assign the file name to the passed entry box.
@@ -167,6 +174,7 @@ class modelGUI(tk.Frame):
 		self.mri_model.importCine(timepoint=0)
 		# Import LGE, if included, and generate full alignment array
 		if self.mri_model.scar:
+			self.scar_cbutton.configure(state='normal')
 			self.progLabel['text'] = 'Importing Scar Stack'
 			self.mri_model.importLGE()
 			with warnings.catch_warnings():
@@ -175,9 +183,12 @@ class modelGUI(tk.Frame):
 					self.mri_model.alignScarCine(timepoint=i)
 		# Import DENSE, if included
 		if self.mri_model.dense:
+			self.dense_cbutton.configure(state='normal')
 			self.progLabel['text'] = 'Importing DENSE Stack'
 			self.mri_model.importDense()
 			self.mri_model.alignDense(cine_timepoint=0)
+			self.dense_timepoint_cbox.configure(values=list(range(len(self.mri_model.dense_aligned_displacement))), state='normal')
+			self.dense_timepoint_cbox.current(0)
 		# Update GUI elements
 		cine_timepoint_cbox.configure(values=list(range(len(self.mri_model.cine_endo))), state='readonly')
 		cine_timepoint_cbox.current(0)
@@ -191,6 +202,7 @@ class modelGUI(tk.Frame):
 		self.mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
 		time_point = int(cine_timepoint_cbox.get())
 		cine_endo_mat, cine_epi_mat = self.mri_mesh.fitContours(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, mesh_type_cbox.get())
+		self.plot_button.configure(state='normal')
 	
 	def cineTimeChanged(self, cine_timepoint_cbox):
 		self.progLabel.configure(text='Updating timepoint in model.')
@@ -203,6 +215,14 @@ class modelGUI(tk.Frame):
 		if self.mri_model.dense:
 			self.mri_model.alignDense(cine_timepoint = new_timepoint)
 		self.progLabel.configure(text='Timepoint successfully updated!')
+	
+	def plotMRIModel(self, cine_timepoint_cbox):
+		time_point = int(cine_timepoint_cbox.get())
+		mri_axes = self.mri_mesh.segmentRender(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts)
+		if self.scar_plot_bool.get():
+			mri_axes = self.mri_mesh.displayScarTrace(self.mri_model.aligned_scar[time_point], ax=mri_axes)
+		if self.dense_plot_bool.get():
+			mri_axes = self.mri_mesh.displayDensePts(self.mri_model.dense_aligned_pts, self.mri_model.dense_slices, self.mri_model.dense_aligned_displacement, dense_plot_quiver=1, timepoint=int(self.dense_timepoint_cbox.get()), ax=mri_axes)
 	
 	def intValidate(self, new_value):
 		if new_value == '':
