@@ -108,6 +108,9 @@ class modelGUI(tk.Frame):
 		num_rings_entry.insert(0, '14')
 		elem_per_ring_entry.insert(0, '25')
 		elem_thru_wall_entry.insert(0, '5')
+		num_rings_entry.configure(validate='key', validatecommand=(num_rings_entry.register(self.intValidate), '%P'))
+		elem_per_ring_entry.configure(validate='key', validatecommand=(num_rings_entry.register(self.intValidate), '%P'))
+		elem_thru_wall_entry.configure(validate='key', validatecommand=(num_rings_entry.register(self.intValidate), '%P'))
 		mesh_type_cbox.grid(row=4, column=11)
 		
 		# Add browse buttons for file exploration, to pass to entry boxes
@@ -119,7 +122,7 @@ class modelGUI(tk.Frame):
 		
 		# Add buttons to form model components
 		ttk.Button(text='Generate MRI Model', command= lambda: self.createMRIModel(sa_filename, la_filename, lge_filename, dense_filenames, cine_timepoint_cbox)).grid(row=2, column=7, columnspan=2)
-		self.meshButton = ttk.Button(text='Generate MRI Mesh', state='disabled', command= lambda: self.createMRIMesh(cine_timepoint_cbox))
+		self.meshButton = ttk.Button(text='Generate Model First', state='disabled', command= lambda: self.createMRIMesh(cine_timepoint_cbox))
 		self.meshButton.grid(row=5, column=10, columnspan=2)
 		
 	def openFileBrowser(self, entry_box, multi='False'):
@@ -161,7 +164,7 @@ class modelGUI(tk.Frame):
 		cine_timepoint_cbox.configure(values=list(range(len(self.mri_model.cine_endo))), state='readonly')
 		cine_timepoint_cbox.current(0)
 		self.progLabel['text'] = 'MRI Model Generated Successfully'
-		self.meshButton.configure(state='normal')
+		self.meshButton.configure(state='normal', text='Generate MRI Mesh')
 
 	def createMRIMesh(self, cine_timepoint_cbox):
 		self.mri_mesh = mesh.Mesh()
@@ -179,7 +182,16 @@ class modelGUI(tk.Frame):
 		if self.mri_model.dense:
 			self.mri_model.alignDense(cine_timepoint = new_timepoint)
 		self.progLabel.configure(text='Timepoint successfully updated!')
-			
+	
+	def intValidate(self, new_value):
+		if new_value == '':
+			return(True)
+		try:
+			int(new_value)
+			return(True)
+		except:
+			return(False)
+	
 root = tk.Tk()
 gui = modelGUI(master=root)
 gui.master.title('Cardiac Modeling Toolbox')
