@@ -43,6 +43,8 @@ class modelGUI(tk.Frame):
 		dense_filenames = tk.StringVar()
 		confocal_dir = tk.StringVar()
 		cine_time_opts = ['N/A']
+		self.scar_plot_bool = tk.IntVar(value=0)
+		self.dense_plot_bool = tk.IntVar(value=0)
 
 		# Create Entry objects for files
 		sa_file_entry = ttk.Entry(width=80, textvariable=sa_filename)
@@ -62,11 +64,18 @@ class modelGUI(tk.Frame):
 		mesh_type_cbox = ttk.Combobox(values=['4x2', '4x4', '4x8'], state='readonly', width=10)
 		mesh_type_cbox.current(0)
 		
+		# Create checkboxes for plot options
+		self.scar_cbutton = ttk.Checkbutton(variable = self.scar_plot_bool)
+		self.dense_cbutton = ttk.Checkbutton(variable = self.dense_plot_bool)
+		self.scar_cbutton.grid(row=9, column=0, sticky='E')
+		self.dense_cbutton.grid(row=10, column=0, sticky='E')
+		
 		# Settings for combobox selections
 		cine_timepoint_cbox.bind('<<ComboboxSelected>>', lambda _ : self.cineTimeChanged(cine_timepoint_cbox))
 		
 		# Grid placement of separators
 		ttk.Separator(orient='vertical').grid(column=9, row=0, rowspan=7, sticky='NS')
+		ttk.Separator(orient='horizontal').grid(column=0, row=8, columnspan=12, sticky='EW')
 		
 		# Create labels for entries
 		#   Filename labels
@@ -88,6 +97,9 @@ class modelGUI(tk.Frame):
 		ttk.Label(text='Elements per Ring:').grid(row=2, column=10, sticky='W')
 		ttk.Label(text='Elements through Wall:').grid(row=3, column=10, sticky='W')
 		ttk.Label(text='Mesh Type:').grid(row=4, column=10, sticky='W')
+		#   Plot setting labels
+		ttk.Label(text='Plot Scar?').grid(row=9, column=0, sticky='W')
+		ttk.Label(text='Plot DENSE?').grid(row=10, column=0, sticky='W')
 		
 		# Set specific label fonts
 		f = font.Font(meshLabel, meshLabel.cget('font'))
@@ -122,7 +134,7 @@ class modelGUI(tk.Frame):
 		
 		# Add buttons to form model components
 		ttk.Button(text='Generate MRI Model', command= lambda: self.createMRIModel(sa_filename, la_filename, lge_filename, dense_filenames, cine_timepoint_cbox)).grid(row=2, column=7, columnspan=2)
-		self.meshButton = ttk.Button(text='Generate Model First', state='disabled', command= lambda: self.createMRIMesh(cine_timepoint_cbox))
+		self.meshButton = ttk.Button(text='Generate Model First', state='disabled', command= lambda: self.createMRIMesh(cine_timepoint_cbox, num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox))
 		self.meshButton.grid(row=5, column=10, columnspan=2)
 		
 	def openFileBrowser(self, entry_box, multi='False'):
@@ -140,10 +152,16 @@ class modelGUI(tk.Frame):
 		
 	def createMRIModel(self, sa_filename, la_filename, lge_filename, dense_filenames, cine_timepoint_cbox):
 		# Create model, import initial cine stack
+		if sa_filename.get() == '' or la_filename.get() == '':
+			self.progLabel['text'] = 'Please select long-axis and short-axis files first'
+			return(False)
 		self.progLabel['text'] = 'Generating MRI Model'
-		dense_filenames_parsed = dense_filenames.get().split('} {')
-		list_replacements = {ord('{') : None, ord('}') : None}
-		dense_filenames_replaced = [temp_str.translate(list_replacements) for temp_str in dense_filenames_parsed]
+		if not(dense_filenames.get() == ''):
+			dense_filenames_parsed = dense_filenames.get().split('} {')
+			list_replacements = {ord('{') : None, ord('}') : None}
+			dense_filenames_replaced = [temp_str.translate(list_replacements) for temp_str in dense_filenames_parsed]
+		else:
+			dense_filenames_replaced = dense_filenames.get()
 		self.mri_model = mrimodel.MRIModel(sa_filename.get(), la_filename.get(), scar_file=lge_filename.get(), dense_file=dense_filenames_replaced)
 		self.progLabel['text'] = 'Importing Cine Stack'
 		self.mri_model.importCine(timepoint=0)
@@ -166,10 +184,13 @@ class modelGUI(tk.Frame):
 		self.progLabel['text'] = 'MRI Model Generated Successfully'
 		self.meshButton.configure(state='normal', text='Generate MRI Mesh')
 
-	def createMRIMesh(self, cine_timepoint_cbox):
-		self.mri_mesh = mesh.Mesh()
+	def createMRIMesh(self, cine_timepoint_cbox, num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox):
+		num_rings = int(num_rings_entry.get())
+		elem_per_ring = int(elem_per_ring_entry.get())
+		elem_in_wall = int(elem_thru_wall_entry.get())
+		self.mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
 		time_point = int(cine_timepoint_cbox.get())
-		cine_endo_mat, cine_epi_mat = self.mri_mesh.fitContours(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, '4x2')
+		cine_endo_mat, cine_epi_mat = self.mri_mesh.fitContours(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, mesh_type_cbox.get())
 	
 	def cineTimeChanged(self, cine_timepoint_cbox):
 		self.progLabel.configure(text='Updating timepoint in model.')
