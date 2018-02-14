@@ -18,6 +18,7 @@ import scipy.stats as spstats
 import numpy as np
 import matplotlib.pyplot as mplt
 from mpl_toolkits.mplot3d import Axes3D
+from helper import ImportHelper
 # Call this to set appropriate printing to view all data from arrays
 np.set_printoptions(threshold=np.inf)
 np.core.arrayprint._line_width = 160
@@ -215,7 +216,7 @@ class MRIModel():
 		for i in range(len(self.dense_file)):
 			dense_file = self.dense_file[i]
 			# Extract Contour Information from DENSE Mat file
-			dense_data = self._loadmat(dense_file)
+			dense_data = ImportHelper.loadmat(dense_file)
 			slice_location = dense_data['SequenceInfo'][0, 0].SliceLocation
 			slice_locations[i] = slice_location
 			epi_dense = np.array(dense_data['ROIInfo']['RestingContour'][0])
@@ -322,7 +323,7 @@ class MRIModel():
 	def _importStack(self, short_axis_file, timepoint=0):
 		"""Imports the short-axis file and formats data from it.
 		
-		Data is imported using the custom _loadmat function
+		Data is imported using the custom loadmat function
 		to open the struct components appropriately. All short-axis
 		data is imported during this function.
 		
@@ -338,7 +339,7 @@ class MRIModel():
 		"""
 		
 		# Import and format the short axis stack and pull relevant variables from the structure.
-		short_axis_data = self._loadmat(short_axis_file)
+		short_axis_data = ImportHelper.loadmat(short_axis_file)
 		setstruct = short_axis_data['setstruct']
 		endo_x = np.array(setstruct['EndoX'])
 		endo_y = np.array(setstruct['EndoY'])
@@ -546,60 +547,6 @@ class MRIModel():
 		an overlay with values indicating regional values for certain pixels or voxels (for 3d).
 		"""
 		pass
-	
-	def _loadmat(self, filename):
-		"""
-		this function should be called instead of direct spio.loadmat
-		as it cures the problem of not properly recovering python dictionaries
-		from mat files. It calls the function check keys to cure all entries
-		which are still mat-objects
-		
-		This and all sub-functions are based on jpapon's answer here:
-			https://stackoverflow.com/questions/7008608/scipy-io-loadmat-nested-structures-i-e-dictionaries
-		"""
-		data = spio.loadmat(filename, struct_as_record=False, squeeze_me=True)
-		return(self._check_keys(data))
-
-	def _check_keys(self, dict_pass):
-		"""
-		checks if entries in dictionary are mat-objects. If yes
-		todict is called to change them to nested dictionaries
-		"""
-		for key in dict_pass:
-			if isinstance(dict_pass[key], spio.matlab.mio5_params.mat_struct):
-				dict_pass[key] = self._todict(dict_pass[key])
-		return(dict_pass)        
-	
-	def _todict(self, matobj):
-		"""
-		A recursive function which constructs from matobjects nested dictionaries
-		"""
-		dict = {}
-		for strg in matobj._fieldnames:
-			elem = matobj.__dict__[strg]
-			if isinstance(elem, spio.matlab.mio5_params.mat_struct):
-				dict[strg] = self._todict(elem)
-			elif isinstance(elem,np.ndarray):
-				dict[strg] = self._tolist(elem)
-			else:
-				dict[strg] = elem
-		return(dict)
-	
-	def _tolist(self, ndarray):
-		"""
-		A recursive function which constructs lists from cellarrays 
-		(which are loaded as numpy ndarrays), recursing into the elements
-		if they contain matobjects.
-		"""
-		elem_list = []            
-		for sub_elem in ndarray:
-			if isinstance(sub_elem, spio.matlab.mio5_params.mat_struct):
-				elem_list.append(self._todict(sub_elem))
-			elif isinstance(sub_elem,np.ndarray):
-				elem_list.append(self._tolist(sub_elem))
-			else:
-				elem_list.append(sub_elem)
-		return(elem_list)
 	
 	def _processKeptSlices(self, setstruct, endo_x):
 		"""Remove time points and slices with no contours
@@ -976,7 +923,7 @@ class MRIModel():
 			apex_base_pts (array): The points indicating the apex and basal points indicated in the file
 		"""
 		# Load the file using custom loadmat function
-		long_axis_data = self._loadmat(long_axis_file)
+		long_axis_data = ImportHelper.loadmat(long_axis_file)
 		# Pull the setstruct data from the global structure
 		lastruct = long_axis_data['setstruct']
 		# Get the apex and basal points from stack transformation
