@@ -359,3 +359,54 @@ class StackHelper():
 			# Return if layer is endocardial: xyz_pts, pinpoints (pp), m_arr
 			returnList = [xyz_pts, pp, m_arr]
 		return(returnList)
+		
+	@staticmethod
+	def prepTransformedStack(transformed_stack, time_indices, j = 0):
+		"""Process output from transformStack to append identifying information.
+		
+		args:
+			transformed_stack: The full output from the transformStack function.
+			cxyz: Array to which to append the output array
+			time_indices: Which time points should be used
+			j: The current slice
+		
+		returns:
+			cxyz (array): Newly lengthened array containing formatted data from the stack
+		"""
+		# Pull the appropriate element from the stack
+		Xd = transformed_stack[0]
+		cxyz = np.array([])
+		# Iterate through the 
+		for k in time_indices:
+			# Pull timepoint data
+			Xd_k = Xd[k]
+			# If every element is NaN, skip this timepoint
+			if np.all(np.isnan(Xd_k)):
+				continue
+				
+			# Store the slice index as an appropriately-shaped array for appending
+			slice_indices = j*np.ones([Xd_k.shape[0], 1])
+			# Append arrays together
+			cxyz_append = np.append(Xd_k, time_indices[k]*np.ones([Xd_k.shape[0], 1]), axis=1)
+			cxyz_append2 = np.append(cxyz_append, slice_indices, axis=1)
+			cxyz = np.append(cxyz, cxyz_append2)
+
+		return(cxyz)
+		
+class MathHelper():
+	"""Contains functions to assist with basic mathematical transformations used frequently.
+	"""
+	
+	@staticmethod
+	def pol2cart(theta, rho):
+		"""Convert polar (theta, rho) coordinates to cartesian (x, y) coordinates"""
+		x = rho * np.cos(theta)
+		y = rho * np.sin(theta)
+		return ([x, y])
+		
+	def cart2pol(x, y):
+		"""Convert cartesian (x,y) coordinates to polar (theta, rho) coordinates"""
+		rho = np.sqrt(np.square(x) + np.square(y))
+		theta = np.arctan2(y,x)
+		theta = np.where(theta < 0, theta + 2*np.pi, theta)
+		return np.array([theta, rho])

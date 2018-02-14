@@ -20,6 +20,7 @@ import matplotlib.pyplot as mplt
 from mpl_toolkits.mplot3d import Axes3D
 from helper import ImportHelper
 from helper import StackHelper
+from helper import MathHelper
 # Call this to set appropriate printing to view all data from arrays
 np.set_printoptions(threshold=np.inf)
 np.core.arrayprint._line_width = 160
@@ -234,18 +235,6 @@ class MRIModel():
 			epi_interp_func = sp.interpolate.interp1d(np.arange(0, 1+1/(epi_dense.shape[0]-1), 1/(epi_dense.shape[0]-1)), epi_dense, axis=0, kind='cubic')
 			endo_interp = endo_interp_func(np.arange(0, 80/79, 1/79))
 			epi_interp = epi_interp_func(np.arange(0, 80/79, 1/79))
-		
-			# Find nearest slice in cine stack
-			#cine_endo_slices = np.unique(self.cine_endo[align_timepoint][:, 2])
-			#cine_epi_slices = np.unique(self.cine_epi[align_timepoint][:, 2])
-			#cine_endo_slice_match = cine_endo_slices[np.where(abs(cine_endo_slices - slice_location) == np.min(abs(cine_endo_slices - slice_location)))[0][0]]
-			#cine_epi_slice_match = cine_epi_slices[np.where(abs(cine_epi_slices - slice_location) == np.min(abs(cine_epi_slices - slice_location)))[0][0]]
-			#cine_endo_slice_inds = np.where(self.cine_endo[align_timepoint][:, 2] == cine_endo_slice_match)[0]
-			#cine_epi_slice_inds = np.where(self.cine_epi[align_timepoint][:, 2] == cine_epi_slice_match)[0]
-			
-			# Get endo and epi traces
-			#cine_slice_endo = self.cine_endo[align_timepoint][cine_endo_slice_inds, :]
-			#cine_slice_epi = self.cine_epi[align_timepoint][cine_endo_slice_inds, :]
 			
 			# Pull timepoints from DENSE
 			dense_timepoints = len(dense_data['DisplacementInfo']['dX'][0])
@@ -253,13 +242,10 @@ class MRIModel():
 			# Shift the DENSE endo and epi contours by the epicardial mean
 			endo_shift = endo_interp[:, :2] - np.mean(epi_interp[:, :2], axis=0)
 			epi_shift = epi_interp[:, :2] - np.mean(epi_interp[:, :2], axis=0)
-			endo_shift_theta, endo_shift_rho = self._cartToPol(endo_shift[:, 0], endo_shift[:, 1])
-			epi_shift_theta, epi_shift_rho = self._cartToPol(epi_shift[:, 0], epi_shift[:, 1])
+			endo_shift_theta, endo_shift_rho = MathHelper.cart2pol(endo_shift[:, 0], endo_shift[:, 1])
+			epi_shift_theta, epi_shift_rho = MathHelper.cart2pol(epi_shift[:, 0], epi_shift[:, 1])
 			dense_endo[i] = endo_shift
 			dense_epi[i] = epi_shift
-			
-			#cine_endo_theta, cine_endo_rho = self._cartToPol(cine_slice_endo[:, 0], cine_slice_endo[:, 1])
-			#cine_epi_theta, cine_epi_rho = self._cartToPol(cine_slice_epi[:, 0], cine_slice_epi[:, 1])
 			
 			# Shift the entire pixel array by the same epicardial mean
 			dense_x = dense_data['DisplacementInfo']['X'] - np.mean(epi_interp[:, 0])
@@ -268,7 +254,7 @@ class MRIModel():
 			
 			dense_pts[i] = np.column_stack((dense_x, dense_y, dense_z))
 			
-			all_dense_theta, all_dense_rho = self._cartToPol(dense_x, dense_y)
+			all_dense_theta, all_dense_rho = MathHelper.cart2pol(dense_x, dense_y)
 			
 			# Get displacement info and store as a 2-D array
 			dense_dx = np.array(dense_data['DisplacementInfo']['dX'])
@@ -605,7 +591,7 @@ class MRIModel():
 		cur_slice = cur_slice - mean_pt
 		
 		# Convert the slice into polar values
-		polar_coords = self._cartToPol(cur_slice[0,:], cur_slice[1,:])[:,1:]
+		polar_coords = MathHelper.cart2pol(cur_slice[0,:], cur_slice[1,:])[:,1:]
 		
 		# Get the theta values for the perpindicular line (polar theta)
 		perp_dot = np.dot([1, perp_slope], [1, 0])
@@ -621,22 +607,9 @@ class MRIModel():
 		theta = th1 if r1<r2 else th2
 		
 		# Reconvert the interpolated rho and theta to cartesian
-		mid_pt = (self._polToCart(r, theta) + mean_pt.reshape([1,2])).reshape(2)
+		mid_pt = (MathHelper.pol2cart(theta, r) + mean_pt.reshape([1,2])).reshape(2)
 		return(mid_pt)
-		
-	def _cartToPol(self, x, y):
-		"""Convert cartesian (x,y) coordinates to polar (theta, rho) coordinates"""
-		rho = np.sqrt(np.square(x) + np.square(y))
-		theta = np.arctan2(y,x)
-		theta = np.where(theta < 0, theta + 2*np.pi, theta)
-		return np.array([theta, rho])
-	
-	def _polToCart(self, rho, theta):
-		"""Convert polar (theta, rho) coordinates to cartesian (x, y) coordinates"""
-		x = rho * np.cos(theta)
-		y = rho * np.sin(theta)
-		return ([x, y])
-	
+
 	def _calcNorm(self, arr_in):
 		"""Calculates the norm of the passed array as the square root of the sum of squares"""
 		norm = np.sqrt(np.sum(np.square(arr_in)))
@@ -676,7 +649,7 @@ class MRIModel():
 		for j in slice_labels:
 			# Pass each slice to be transformed and reformat for return
 			transformed_stack = StackHelper.transformStack(setstruct, j-1, layer)
-			cxyz_slice = self._prepareTransformedStack(transformed_stack, time_indices, j)
+			cxyz_slice = StackHelper.prepTransformedStack(transformed_stack, time_indices, j)
 			cxyz = np.append(cxyz, cxyz_slice)
 			# Track heartrate during each slice acquisition
 			heartrate = np.append(heartrate, [hr, slice_counter])
@@ -696,38 +669,6 @@ class MRIModel():
 		else:
 			returnList = [cxyz, Pd, m_arr, heartrate]
 		return(returnList)
-	
-	def _prepareTransformedStack(self, transformed_stack, time_indices, j = 0):
-		"""Process output from transformStack to append identifying information.
-		
-		args:
-			transformed_stack: The full output from the transformStack function.
-			cxyz: Array to which to append the output array
-			time_indices: Which time points should be used
-			j: The current slice
-		
-		returns:
-			cxyz (array): Newly lengthened array containing formatted data from the stack
-		"""
-		# Pull the appropriate element from the stack
-		Xd = transformed_stack[0]
-		cxyz = np.array([])
-		# Iterate through the 
-		for k in time_indices:
-			# Pull timepoint data
-			Xd_k = Xd[k]
-			# If every element is NaN, skip this timepoint
-			if np.all(np.isnan(Xd_k)):
-				continue
-				
-			# Store the slice index as an appropriately-shaped array for appending
-			slice_indices = j*np.ones([Xd_k.shape[0], 1])
-			# Append arrays together
-			cxyz_append = np.append(Xd_k, time_indices[k]*np.ones([Xd_k.shape[0], 1]), axis=1)
-			cxyz_append2 = np.append(cxyz_append, slice_indices, axis=1)
-			cxyz = np.append(cxyz, cxyz_append2)
-
-		return(cxyz)
 	
 	def _importLongAxis(self, long_axis_file):
 		"""Imports data from a long-axis file with pinpoints for apex and basal locations
@@ -778,8 +719,8 @@ class MRIModel():
 			cur_endo_shift = cur_endo - np.mean(cur_epi, axis=0)
 			cur_epi_shift = cur_epi - np.mean(cur_epi, axis=0)
 			# Convert the shifted cartesian points to polar
-			theta_endo, rho_endo = self._cartToPol(cur_endo_shift[:, 0], cur_endo_shift[:, 1])
-			theta_epi, rho_epi = self._cartToPol(cur_epi_shift[:, 0], cur_epi_shift[:, 1])
+			theta_endo, rho_endo = MathHelper.cart2pol(cur_endo_shift[:, 0], cur_endo_shift[:, 1])
+			theta_epi, rho_epi = MathHelper.cart2pol(cur_epi_shift[:, 0], cur_epi_shift[:, 1])
 			# Define a subfunction that returns a lambda function, which provides the indices in angles where theta falls
 			def getIndices(j): return lambda theta: np.where((angles[j] <= theta) & (angles[j+1] > theta))[0].tolist()
 			# Shifts theta_endo from 0:2*pi to -pi:pi
@@ -789,7 +730,7 @@ class MRIModel():
 			endo_idx = [getIndices(j)(theta_endo) for j in range(angles.size-1)]
 			epi_idx = [getIndices(j)(theta_epi) for j in range(angles.size-1)]
 			if scar_flag:
-				theta_scar, rho_scar = self._cartToPol(cur_scar_shift[:, 0], cur_scar_shift[:, 1]) if cur_scar.size > 0 else [np.nan, np.nan]
+				theta_scar, rho_scar = MathHelper.cart2pol(cur_scar_shift[:, 0], cur_scar_shift[:, 1]) if cur_scar.size > 0 else [np.nan, np.nan]
 				if cur_scar.size > 0: theta_scar = [ts_i if ts_i < math.pi else ts_i-2*math.pi for ts_i in theta_scar]
 				scar_idx = [getIndices(j)(theta_scar) if len(getIndices(j)(theta_scar)) > 0 else [] for j in range(angles.size-1)]
 				scar_bin = [[angles[j], np.mean(angles[j:j+2]), angles[j+1], min(rho_scar[scar_idx[j]]), max(rho_scar[scar_idx[j]])] if len(scar_idx[j]) > 0 else [angles[j], np.mean(angles[j:j+2]), angles[j+1], np.nan, np.nan] for j in range(angles.size-1)]
@@ -859,13 +800,13 @@ class MRIModel():
 			# Convert Endo Stack from Polar to Cartesian:
 			endo_pol_rho = endo_polar[slices, :, 3]
 			endo_pol_theta = endo_polar[slices, :, 1]
-			x_endo_cart, y_endo_cart = self._polToCart(endo_pol_rho, endo_pol_theta)
+			x_endo_cart, y_endo_cart = MathHelper.pol2cart(endo_pol_theta, endo_pol_rho)
 			endo_z = [endo[slices][0, 2] for i in range(len(x_endo_cart))]
 			
 			# Convert Epi Stack from Polar to Cartesian:
 			epi_pol_rho = epi_polar[slices, :, 3]
 			epi_pol_theta = epi_polar[slices, :, 1]
-			x_epi_cart, y_epi_cart = self._polToCart(epi_pol_rho, epi_pol_theta)
+			x_epi_cart, y_epi_cart = MathHelper.pol2cart(epi_pol_theta, epi_pol_rho)
 			epi_z = [epi[slices][0, 2] for i in range(len(x_epi_cart))]
 			
 			# Shift Points back from previous Polar Origin Shift:
@@ -921,8 +862,8 @@ class MRIModel():
 			epi_y = cur_slice_epi[:, 1] - slice_center[1]
 			
 			# Convert the cartesian contours to polar
-			endo_theta, endo_rho = self._cartToPol(endo_x, endo_y)
-			epi_theta, epi_rho = self._cartToPol(epi_x, epi_y)
+			endo_theta, endo_rho = MathHelper.cart2pol(endo_x, endo_y)
+			epi_theta, epi_rho = MathHelper.cart2pol(epi_x, epi_y)
 			endo_theta = [cur_slice_theta_i - 2*np.pi if cur_slice_theta_i > np.pi else cur_slice_theta_i for cur_slice_theta_i in endo_theta]
 			epi_theta = [cur_slice_theta_i - 2*np.pi if cur_slice_theta_i > np.pi else cur_slice_theta_i for cur_slice_theta_i in epi_theta]
 			# Get rho values for each angle bin based on theta
@@ -961,8 +902,8 @@ class MRIModel():
 			scar_inner_rho = [endo_rho_mean[j] + cur_scar[j, 1] * (epi_rho_mean[j] - endo_rho_mean[j]) for j in range(cur_scar.shape[0])]
 			scar_outer_rho = [endo_rho_mean[j] + cur_scar[j, 2] * (epi_rho_mean[j] - endo_rho_mean[j]) for j in range(cur_scar.shape[0])]
 			# Convert the scar values to cartesian
-			scar_inner_x, scar_inner_y = self._polToCart(scar_inner_rho, cur_scar[:, 0])
-			scar_outer_x, scar_outer_y = self._polToCart(scar_outer_rho, cur_scar[:, 0])
+			scar_inner_x, scar_inner_y = MathHelper.pol2cart(cur_scar[:, 0], scar_inner_rho)
+			scar_outer_x, scar_outer_y = MathHelper.pol2cart(cur_scar[:, 0], scar_outer_rho)
 			# If there is no scar trace here, just move to the next slice and append an empty array for the current contour
 			if np.all(np.isnan(scar_inner_x)):
 				full_scar_contour.append(np.array([]))
@@ -1082,10 +1023,10 @@ class MRIModel():
 			cine_epi_slice = cine_epi_timepoint[slice_in_cine, :] - np.mean(cine_epi_timepoint[slice_in_cine, :], axis=0)
 			
 			# Convert both sets of slices to polar
-			dense_endo_theta, dense_endo_rho = self._cartToPol(dense_slice_endo[:, 0], dense_slice_endo[:, 1])
-			dense_epi_theta, dense_epi_rho = self._cartToPol(dense_slice_epi[:, 0], dense_slice_epi[:, 1])
-			cine_endo_theta, cine_endo_rho = self._cartToPol(cine_endo_slice[:, 0], cine_endo_slice[:, 1])
-			cine_epi_theta, cine_epi_rho = self._cartToPol(cine_epi_slice[:, 0], cine_epi_slice[:, 1])
+			dense_endo_theta, dense_endo_rho = MathHelper.cart2pol(dense_slice_endo[:, 0], dense_slice_endo[:, 1])
+			dense_epi_theta, dense_epi_rho = MathHelper.cart2pol(dense_slice_epi[:, 0], dense_slice_epi[:, 1])
+			cine_endo_theta, cine_endo_rho = MathHelper.cart2pol(cine_endo_slice[:, 0], cine_endo_slice[:, 1])
+			cine_epi_theta, cine_epi_rho = MathHelper.cart2pol(cine_epi_slice[:, 0], cine_epi_slice[:, 1])
 			
 			# Generate interpolation equations to ensure order and number of points is the same
 			theta_interp_pts = np.linspace(0, 2*math.pi, 100)[:-1]
@@ -1106,8 +1047,8 @@ class MRIModel():
 			cine_interp_vals = np.append(np.column_stack((theta_interp_pts, cine_endo_interp_rho)), np.column_stack((theta_interp_pts, cine_epi_interp_rho)), axis=0)
 			
 			# Convert back to x and y to get a 2d transform field
-			dense_interp_x, dense_interp_y = self._polToCart(dense_interp_vals[:, 1], dense_interp_vals[:, 0])
-			cine_interp_x, cine_interp_y = self._polToCart(cine_interp_vals[:, 1], cine_interp_vals[:, 0])
+			dense_interp_x, dense_interp_y = MathHelper.pol2cart(dense_interp_vals[:, 0], dense_interp_vals[:, 1])
+			cine_interp_x, cine_interp_y = MathHelper.pol2cart(cine_interp_vals[:, 0], cine_interp_vals[:, 1])
 			
 			# Calculate the linear distance in x and y between 
 			x_dist = cine_interp_x - dense_interp_x
