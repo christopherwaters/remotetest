@@ -13,8 +13,8 @@ import math
 import tkinter as tk
 from tkinter import filedialog
 import scipy as sp
-import scipy.io as spio
-import scipy.stats as spstats
+#import scipy.io as spio
+#import scipy.stats as spstats
 import numpy as np
 import matplotlib.pyplot as mplt
 from mpl_toolkits.mplot3d import Axes3D
@@ -146,7 +146,7 @@ class MRIModel():
 		# Iterate through time points
 		for i in range(len(endo_by_timept)):
 			# Get polar endo and epi for the selected timepoint
-			endo_polar, epi_polar, _ = self._convertSlicesToPolar(kept_slices, endo_by_timept[i], epi_by_timept[i])
+			endo_polar, epi_polar, _ = StackHelper.convertSlicesToPolar(kept_slices, endo_by_timept[i], epi_by_timept[i])
 			endo_polar_alltime[i] = endo_polar
 			epi_polar_alltime[i] = epi_polar
 		
@@ -155,7 +155,7 @@ class MRIModel():
 			wall_thickness_alltime[i] = wall_thickness
 		
 			# Retranslate results to cartesian from polar and shift:
-			cine_endo, cine_epi = self._shiftPolarCartesian(endo_polar, epi_polar, endo_by_timept[1], epi_by_timept[1], kept_slices, axis_center, wall_thickness)
+			cine_endo, cine_epi = StackHelper.shiftPolarCartesian(endo_polar, epi_polar, endo_by_timept[1], epi_by_timept[1], kept_slices, axis_center, wall_thickness)
 			cine_endo_alltime[i] = cine_endo
 			cine_epi_alltime[i] = cine_epi
 		
@@ -279,34 +279,6 @@ class MRIModel():
 		
 		return(True)
 	
-	def _getMaskXY(self, mask, maskstruct):
-		"""General form to get binary masks (such as scar data) as xy overlays.
-		"""
-		kept_slices = maskstruct['KeptSlices']
-		mask_max = max([sum(sum(mask[i])) for i in range(mask.shape[0])])
-		mask_pts = np.array(np.where(mask)) + 1
-		mask_slices = np.array(list(set(mask_pts[0, :])))
-		mask_pts[0] -= 1
-		mask_x = np.zeros([1, mask.shape[0], mask_max])
-		mask_y = np.zeros([1, mask.shape[0], mask_max])
-		for i in mask_slices:
-			temp_x = mask_pts[1, np.where(mask_pts[0, :] == i-1)]
-			temp_y = mask_pts[2, np.where(mask_pts[0, :] == i-1)]
-			mask_x[0, i-1, 0:temp_x.size] = temp_x
-			mask_y[0, i-1, 0:temp_y.size] = temp_y
-		maskstruct['mask_x'] = mask_x
-		maskstruct['mask_y'] = mask_y
-		cxyz_mask, mask_m, _ = self._rotateSAStack(maskstruct, kept_slices, layer='mask')
-		for i in mask_slices:
-			cxyz_slice = cxyz_mask[np.where(cxyz_mask[:, 4] == i), :][0]
-			mode_val, mode_count = spstats.mode(cxyz_slice[:, 0:2])
-			max_mode = max(mode_count.squeeze())
-			if max_mode > 1:
-				mode_ind = np.argmax(mode_count.squeeze())
-				cur_mode = mode_val.squeeze()[mode_ind]
-				cxyz_mask = np.delete(cxyz_mask, np.where(cxyz_mask[:, mode_ind] == cur_mode), axis=0)
-		return([cxyz_mask, kept_slices, mask_slices])
-	
 	def _importStack(self, short_axis_file, timepoint=0):
 		"""Imports the short-axis file and formats data from it.
 		
@@ -355,7 +327,7 @@ class MRIModel():
 			epi_y = epi_y.reshape(1, shape[0], shape[1])
 
 		# Process the setstruct to get time points and slices that were segmented
-		kept_slices, time_id = self._processKeptSlices(setstruct, endo_x)
+		kept_slices, time_id = StackHelper.removeEmptySlices(setstruct, endo_x)
 		kept_slices = np.array(kept_slices)
 		time_id = np.squeeze(np.array(time_id))
 		endo_pin_x = np.array(setstruct['EndoPinX'])
@@ -384,7 +356,7 @@ class MRIModel():
 		endo_pins = np.array([x_pins, y_pins]).transpose()
 		
 		# Calculate the Septal Mid-Point from the pinpoints
-		sept_pt = self._findEndoMidPt(endo_pins, time_id, septal_slice, endo_x, endo_y)
+		sept_pt = MathHelper.findMidPt(endo_pins, time_id, septal_slice, endo_x, endo_y)
 
 		# Add the midpoint to the x and y pinpoint list and add it back to setstruct
 		#        This part requires somewhat complex list comprehensions to reduce clutter and due to the complexity of the data format
@@ -403,8 +375,8 @@ class MRIModel():
 		setstruct['epi_y'] = epi_y
 		
 		# Rotate the endo and epi contours (and pinpoints with the endo contour)
-		cxyz_sa_endo, rv_insertion_pts, _, _ = self._rotateSAStack(setstruct, kept_slices, layer='endo')
-		cxyz_sa_epi, _, _ = self._rotateSAStack(setstruct, kept_slices, layer='epi')
+		cxyz_sa_endo, rv_insertion_pts, _, _ = StackHelper.rotateStack(setstruct, kept_slices, layer='endo')
+		cxyz_sa_epi, _, _ = StackHelper.rotateStack(setstruct, kept_slices, layer='epi')
 
 		return([cxyz_sa_endo, cxyz_sa_epi, rv_insertion_pts, setstruct, septal_slice])
 	
@@ -433,13 +405,13 @@ class MRIModel():
 			mask_slices (list): The list of slices that contained regions of interest for the mask
 		"""
 		# Get the mask XY values
-		cxyz_mask, kept_slices, mask_slices = self._getMaskXY(mask, mask_struct)
+		cxyz_mask, kept_slices, mask_slices = StackHelper.getMaskXY(mask, mask_struct)
 		
 		# Convert the stacks
 		mask_abs, mask_endo, mask_epi, axis_center, all_mask = StackHelper.getContourFromStack(mask_endo_stack, mask_epi_stack, mask_struct, mask_insertion_pts, mask_septal_slice, self.apex_base_pts, cxyz_mask)
 		
 		# Get polar values and wall thickness
-		mask_endo_polar, mask_epi_polar, mask_polar = self._convertSlicesToPolar(kept_slices, mask_endo, mask_epi, all_mask, scar_flag=True)
+		mask_endo_polar, mask_epi_polar, mask_polar = StackHelper.convertSlicesToPolar(kept_slices, mask_endo, mask_epi, all_mask, scar_flag=True)
 		wall_thickness = np.append(np.expand_dims(mask_endo_polar[:, :, 1], axis=2), np.expand_dims(mask_epi_polar[:, :, 3] - mask_endo_polar[:, :, 3], axis=2), axis=2)
 		
 		# Calculate ratio through wall based on angle binning
@@ -524,151 +496,16 @@ class MRIModel():
 				mask_ratio[i, :, :] = mask_slice
 		
 		# Translate Endo and Epicardial contours back to cartesian
-		mask_endo_cart, mask_epi_cart = self._shiftPolarCartesian(mask_endo_polar, mask_epi_polar, mask_endo, mask_epi, mask_slices, axis_center, wall_thickness)
+		mask_endo_cart, mask_epi_cart = StackHelper.shiftPolarCartesian(mask_endo_polar, mask_epi_polar, mask_endo, mask_epi, mask_slices, axis_center, wall_thickness)
 		avg_wall_thickness = np.mean(wall_thickness[:, :, 1])
 		
 		return([mask_abs, mask_endo, mask_epi, mask_ratio, mask_slices])
-	
-	def _getOverlayData(self):
-		"""The purpose of this function is to allow generalized import of data that is formatted as
-		an overlay with values indicating regional values for certain pixels or voxels (for 3d).
-		"""
-		pass
-	
-	def _processKeptSlices(self, setstruct, endo_x):
-		"""Remove time points and slices with no contours
-		
-		args:
-			setstruct: SEGMENT structure in the original short-axis file.
-			endo_x: The x-values of the endocardial contours from SEGMENT.
-			
-		returns:
-			list kept_slices: List of slices that have contours.
-			list time_id: Which time points have been segmented.
-		"""
-		
-		# Start with a full list of all slices
-		kept_slices = np.arange(setstruct['ZSize']) + 1
-		
-		# Find where the slices have not received a contour trace and remove them
-		no_trace = np.sum(np.isnan(endo_x), axis=2)
-		delete_slices = no_trace != 0
-		delete_slices = np.sum(delete_slices, axis=0) == delete_slices.shape[0]
-		kept_slices = kept_slices[~delete_slices]
-		time_id = np.where(no_trace[:,kept_slices[0] - 1] == 0)
-		return([kept_slices, time_id])
 	
 	def _findRVSlice(self, pin_x):
 		"""Find the slice where the pinpoints have been placed"""
 		# Sum the pinpoint locations to find the nonzero slice where the pinpoints have been placed
 		septal_slice = np.where([np.sum(pin_x[:, cur_slice][0]) for cur_slice in range(pin_x.shape[1])])
 		return(septal_slice)
-		
-	def _findEndoMidPt(self, endo_pins, time_id, septal_slice, endo_x, endo_y):
-		"""Calculate the mid-septal point based on the pinpoints already placed
-		
-		args:
-			endo_pins: array containing the rv insertion pinpoints
-			time_id: which time point to use for calculation
-			septal_slice: which slice to use for calculation
-			endo_x: the x values defining the endocardial contour
-			endo_y: the y values defining the endocardial contour
-		returns:
-			array mid_pt: The septal midpoint between the two other pinpoints
-		"""
-		
-		# Get mean point between the 2 pinpoints.
-		mean_pt = np.mean(endo_pins, axis=0).reshape([2, 1])
-		
-		# Calculate the perpindicular line between the two points (just slope, no intercept)
-		slope = (endo_pins[1,1] - endo_pins[0,1])/(endo_pins[1,0] - endo_pins[0,0])
-		perp_slope = -1/slope
-		
-		# Get the current slice and shift it by the mean point
-		cur_slice = np.array([endo_x[time_id, septal_slice, :], endo_y[time_id, septal_slice, :]])
-		cur_shape = cur_slice.shape
-		cur_slice = cur_slice.reshape(cur_shape[0], cur_shape[3])
-		cur_slice = cur_slice - mean_pt
-		
-		# Convert the slice into polar values
-		polar_coords = MathHelper.cart2pol(cur_slice[0,:], cur_slice[1,:])[:,1:]
-		
-		# Get the theta values for the perpindicular line (polar theta)
-		perp_dot = np.dot([1, perp_slope], [1, 0])
-		perp_norm = self._calcNorm([1, 1*perp_slope])
-		th1 = np.arccos(perp_dot/perp_norm)
-		th2 = th1 + np.pi;
-		
-		# Calculate the rho values for the two theta values by interpolation
-		r_interp = sp.interpolate.interp1d(polar_coords[0,:], polar_coords[1,:])
-		r1 = r_interp(th1)
-		r2 = r_interp(th2)
-		r = r1 if r1<r2 else r2
-		theta = th1 if r1<r2 else th2
-		
-		# Reconvert the interpolated rho and theta to cartesian
-		mid_pt = (MathHelper.pol2cart(theta, r) + mean_pt.reshape([1,2])).reshape(2)
-		return(mid_pt)
-
-	def _calcNorm(self, arr_in):
-		"""Calculates the norm of the passed array as the square root of the sum of squares"""
-		norm = np.sqrt(np.sum(np.square(arr_in)))
-		return norm
-	
-	def _rotateSAStack(self, setstruct, slice_labels, layer='endo', axial_flag=False):
-		"""Rotates Short-Axis Stack based on septum location.
-		
-		args:
-			setstruct (dict): The structure from the SEGMENT data file
-			slice_labels (list): The list of slices that are included in the stack
-			layer (string): Which layer is being rotated (endo, epi, scar)
-			axial_flag (bool): Check if image orientation is already correct
-		
-		returns:
-			cxyz (array): The transformed and rotated contour
-			m_arr (array): The multiplication array used in the transform process
-			Pd (array): Unknown
-			heartrate (array): Heartrate for each slice taken
-		"""
-		
-		# Set up initial variables for future use.
-		slice_counter = 1
-		cxyz = np.array([])
-		heartrate = np.array([])
-		hr = setstruct['HeartRate']
-		
-		# Determine orientation of image and exit if it is correct
-		if axial_flag:
-			if (abs(abs(setstruct['ImageOrientation'][0])-1) >= 1E-7 or
-				  abs(abs(setstruct['ImageOrientation'][4])-1) >= 1E-7):
-				print('Image Orientation Correct')
-				return(0)
-		
-		# Rotate stacks and format data for return.
-		time_indices = range(setstruct['TSize'])
-		for j in slice_labels:
-			# Pass each slice to be transformed and reformat for return
-			transformed_stack = StackHelper.transformStack(setstruct, j-1, layer)
-			cxyz_slice = StackHelper.prepTransformedStack(transformed_stack, time_indices, j)
-			cxyz = np.append(cxyz, cxyz_slice)
-			# Track heartrate during each slice acquisition
-			heartrate = np.append(heartrate, [hr, slice_counter])
-			# Update the slice counter (it can differ from slice_labels due to skipped slices)
-			slice_counter += 1
-			# Determine what values to return based on the layer selected.
-			if layer == 'epi' or layer == 'mask':
-				m_arr = transformed_stack[1]
-			else:
-				Pd = transformed_stack[1]
-				m_arr = transformed_stack[2]
-		# Reshape the transformed stack as a nx5 array
-		cxyz = cxyz.reshape([int(cxyz.size/5), 5])
-		# Set the returned data based on the layer
-		if layer == 'epi' or layer == 'mask':
-			returnList = [cxyz, m_arr, heartrate]
-		else:
-			returnList = [cxyz, Pd, m_arr, heartrate]
-		return(returnList)
 	
 	def _importLongAxis(self, long_axis_file):
 		"""Imports data from a long-axis file with pinpoints for apex and basal locations
@@ -685,81 +522,7 @@ class MRIModel():
 		# Get the apex and basal points from stack transformation
 		apex_base_pts, pinpts = StackHelper.transformStack(lastruct, layer='long')
 		return(apex_base_pts)
-		
-	def _convertSlicesToPolar(self, slices, endo, epi, scar=None, scar_flag=False, num_bins = 50):
-		"""Convert an epicardial and endocardial contour (and scar data) from cartesian to polar coordinates
-		
-		args:
-			slices (list): the slices that are being processed
-			endo (array): the cartesian points of the endocardial contour
-			epi (array): the cartesian points of the epicardial contour
-			scar (array): the cartesian points dictating scar position
-			scar_flag (boolean): boolean indicating presence of scar data
-			num_bins (integer): number of angles in the range of -pi to pi
-		returns:
-			endo_polar (array): polar coordinates of the endocardial contour
-			epi_polar (array): polar coordinates of the endocardial contour
-			scar_polar (array): polar coordinates of the inner and outer scar contour
-		"""
-		# Set up initial variables, including binned angle values
-		angles = np.linspace(-math.pi, math.pi, num_bins)
-		endo_polar = []
-		epi_polar = []
-		scar_polar = []
-		
-		# Iterate through each slice and calculate polar values
-		for i in slices-1:
-			# Grab data from current slice
-			cur_endo = endo[i]
-			cur_epi = epi[i]
-			if scar_flag:
-				cur_scar = scar[i]
-				cur_scar_shift = cur_scar - np.mean(cur_epi, axis=0) if cur_scar.size > 0 else cur_scar
-			# Shift the contours by the average epicardial point
-			cur_endo_shift = cur_endo - np.mean(cur_epi, axis=0)
-			cur_epi_shift = cur_epi - np.mean(cur_epi, axis=0)
-			# Convert the shifted cartesian points to polar
-			theta_endo, rho_endo = MathHelper.cart2pol(cur_endo_shift[:, 0], cur_endo_shift[:, 1])
-			theta_epi, rho_epi = MathHelper.cart2pol(cur_epi_shift[:, 0], cur_epi_shift[:, 1])
-			# Define a subfunction that returns a lambda function, which provides the indices in angles where theta falls
-			def getIndices(j): return lambda theta: np.where((angles[j] <= theta) & (angles[j+1] > theta))[0].tolist()
-			# Shifts theta_endo from 0:2*pi to -pi:pi
-			theta_endo = [te_i if te_i < math.pi else te_i-2*math.pi for te_i in theta_endo]
-			theta_epi = [te_i if te_i < math.pi else te_i-2*math.pi for te_i in theta_epi]
-			# Get the indices (in angles) where theta falls for endo and epi contours
-			endo_idx = [getIndices(j)(theta_endo) for j in range(angles.size-1)]
-			epi_idx = [getIndices(j)(theta_epi) for j in range(angles.size-1)]
-			if scar_flag:
-				theta_scar, rho_scar = MathHelper.cart2pol(cur_scar_shift[:, 0], cur_scar_shift[:, 1]) if cur_scar.size > 0 else [np.nan, np.nan]
-				if cur_scar.size > 0: theta_scar = [ts_i if ts_i < math.pi else ts_i-2*math.pi for ts_i in theta_scar]
-				scar_idx = [getIndices(j)(theta_scar) if len(getIndices(j)(theta_scar)) > 0 else [] for j in range(angles.size-1)]
-				scar_bin = [[angles[j], np.mean(angles[j:j+2]), angles[j+1], min(rho_scar[scar_idx[j]]), max(rho_scar[scar_idx[j]])] if len(scar_idx[j]) > 0 else [angles[j], np.mean(angles[j:j+2]), angles[j+1], np.nan, np.nan] for j in range(angles.size-1)]
-			# Create the list for the current slice containing: [angle bin min, angle bin average, angle bin max, average contour rho in that bin (nan if no contour point in that bin)]
-			#	Creates this list for both endo and epi. For scar, the bin indicates minimum and maximum rho, instead of average rho
-			endo_bin = [[angles[j], np.mean(angles[j:j+2]), angles[j+1], np.mean(rho_endo[endo_idx[j]])] if len(endo_idx[j]) > 0 else [angles[j], np.mean(angles[j:j+2]), angles[j+1], np.nan] for j in range(angles.size-1)]
-			epi_bin = [[angles[j], np.mean(angles[j:j+2]), angles[j+1], np.mean(rho_epi[epi_idx[j]])] if len(endo_idx[j]) > 0 else [angles[j], np.mean(angles[j:j+2]), angles[j+1], np.nan] for j in range(angles.size-1)]
-			# Append the current slice to the global polar matrix
-			endo_polar.append(np.array(endo_bin))
-			epi_polar.append(np.array(epi_bin))
-			if scar_flag: scar_polar.append(np.array(scar_bin))
-				
-		# Convert lists to arrays:
-		endo_polar = np.array(endo_polar)
-		epi_polar = np.array(epi_polar)
-		scar_polar = np.array(scar_polar)
-		
-		# Interpolate nan values in endo and epi polar arrays:
-		for cur_slice in range(endo_polar.shape[0]):
-			for angle in range(endo_polar.shape[1]):
-				angle_less = (angle - 1) % endo_polar.shape[1]
-				angle_more = (angle + 1) % endo_polar.shape[1]
-				if np.isnan(endo_polar[cur_slice, angle, 3]):
-					endo_polar[cur_slice, angle, 3] = (endo_polar[cur_slice, angle_less, 3] + endo_polar[cur_slice, angle_more, 3])/2
-				if np.isnan(epi_polar[cur_slice, angle, 3]):
-					epi_polar[cur_slice, angle, 3] = (epi_polar[cur_slice, angle_less, 3] + epi_polar[cur_slice, angle_more, 3])/2
-
-		return([endo_polar, epi_polar, scar_polar])
-		
+	
 	def _plotStacks(self, abs_shifted, ab_list, endo_shifted, epi_shifted, scar_shifted=[], scar=False):
 		"""Plot all pinpoints, endocardial contour, epicardial contour, and (if passed) scar points"""
 		# Pull and convert values
@@ -780,56 +543,7 @@ class MRIModel():
 			# Plot all of the scar points passed
 			scar_shift_arr = np.array(scar_shifted)
 			ax.scatter(scar_shift_arr[:, 0], scar_shift_arr[:, 1], scar_shift_arr[:, 2], c='k')
-
-	def _shiftPolarCartesian(self, endo_polar, epi_polar, endo, epi, kept_slices, axis_center, wall_thickness):
-		"""Shift polar array into cartesian coordinates
-		
-		args:
-			endo_polar (array): polar endocardial contour
-			epi_polar (array): polar epicardial contour
-			endo (array): endocardial points from getEndoEpiFromStack
-			epi (array): epicardial pionts from getEndoEpiFromStack
-			kept_slices (list): the slices with contours from SEGMENT
-			axis_center (array): the center point of the apex-base axis in each slice
-			wall_thickness (array): wall thickness (polar) in each angle for each slice
-		"""
-		cine_endo = []
-		cine_epi = []
-		for slices in kept_slices-1:
-		
-			# Convert Endo Stack from Polar to Cartesian:
-			endo_pol_rho = endo_polar[slices, :, 3]
-			endo_pol_theta = endo_polar[slices, :, 1]
-			x_endo_cart, y_endo_cart = MathHelper.pol2cart(endo_pol_theta, endo_pol_rho)
-			endo_z = [endo[slices][0, 2] for i in range(len(x_endo_cart))]
-			
-			# Convert Epi Stack from Polar to Cartesian:
-			epi_pol_rho = epi_polar[slices, :, 3]
-			epi_pol_theta = epi_polar[slices, :, 1]
-			x_epi_cart, y_epi_cart = MathHelper.pol2cart(epi_pol_theta, epi_pol_rho)
-			epi_z = [epi[slices][0, 2] for i in range(len(x_epi_cart))]
-			
-			# Shift Points back from previous Polar Origin Shift:
-			polar_center = np.mean([x_epi_cart, y_epi_cart], axis=1)
-			center_diff = [polar_center[0] - axis_center[slices][0], polar_center[1] - axis_center[slices][1]]
-			x_endo_cart -= center_diff[0]
-			y_endo_cart -= center_diff[1]
-			x_epi_cart -= center_diff[0]
-			y_epi_cart -= center_diff[1]
-
-			wall = wall_thickness[slices, :, 1]
-			cine_endo.append([x_endo_cart, y_endo_cart, endo_z, wall])
-			cine_epi.append([x_epi_cart, y_epi_cart, epi_z, wall])
-		
-		# Swap the axes and reshape to get format the endo and epi traces
-		temp_cine_endo = np.swapaxes(np.array(cine_endo), 1, 2)
-		new_cine_endo = temp_cine_endo.reshape([temp_cine_endo.shape[0]*temp_cine_endo.shape[1], temp_cine_endo.shape[2]])
-		
-		temp_cine_epi = np.swapaxes(np.array(cine_epi), 1, 2)
-		new_cine_epi = temp_cine_epi.reshape([temp_cine_epi.shape[0]*temp_cine_epi.shape[1], temp_cine_epi.shape[2]])
-
-		return([new_cine_endo, new_cine_epi])
-		
+	
 	def alignScarCine(self, timepoint=0):
 		"""One of the attempts to align the scar and cine meshes.
 		"""
