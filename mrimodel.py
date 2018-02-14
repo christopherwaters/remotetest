@@ -19,6 +19,7 @@ import numpy as np
 import matplotlib.pyplot as mplt
 from mpl_toolkits.mplot3d import Axes3D
 from helper import ImportHelper
+from helper import StackHelper
 # Call this to set appropriate printing to view all data from arrays
 np.set_printoptions(threshold=np.inf)
 np.core.arrayprint._line_width = 160
@@ -116,7 +117,7 @@ class MRIModel():
 		kept_slices = sastruct['KeptSlices']
 		
 		# Get the adjusted contours from the stacks
-		abs_shifted, endo, epi, axis_center = self._getEndoEpiFromStack(endo_stack, epi_stack, sastruct, rv_insertion_pts, septal_slice, self.apex_base_pts)
+		abs_shifted, endo, epi, axis_center = StackHelper.getContourFromStack(endo_stack, epi_stack, sastruct, rv_insertion_pts, septal_slice, self.apex_base_pts)
 		
 		# Sort endo and epi traces by timepoint
 		#	Pull time points from stack traces, then generate lists to store indices
@@ -449,7 +450,7 @@ class MRIModel():
 		cxyz_mask, kept_slices, mask_slices = self._getMaskXY(mask, mask_struct)
 		
 		# Convert the stacks
-		mask_abs, mask_endo, mask_epi, axis_center, all_mask = self._getEndoEpiFromStack(mask_endo_stack, mask_epi_stack, mask_struct, mask_insertion_pts, mask_septal_slice, self.apex_base_pts, cxyz_mask)
+		mask_abs, mask_endo, mask_epi, axis_center, all_mask = StackHelper.getContourFromStack(mask_endo_stack, mask_epi_stack, mask_struct, mask_insertion_pts, mask_septal_slice, self.apex_base_pts, cxyz_mask)
 		
 		# Get polar values and wall thickness
 		mask_endo_polar, mask_epi_polar, mask_polar = self._convertSlicesToPolar(kept_slices, mask_endo, mask_epi, all_mask, scar_flag=True)
@@ -1024,100 +1025,7 @@ class MRIModel():
 			# Plot all of the scar points passed
 			scar_shift_arr = np.array(scar_shifted)
 			ax.scatter(scar_shift_arr[:, 0], scar_shift_arr[:, 1], scar_shift_arr[:, 2], c='k')
-			
-	def _getEndoEpiFromStack(self, endo_stack, epi_stack, sastruct, rv_insertion_pts, septal_slice, apex_base_pts, scar_stack=np.empty([0])):
-		"""Using the stacks, construct the endo and epi contours in proper format, abs points, axis center, and (if passed) scar
-		
-		Uses several matrix transformations to convert the stack data into the finalized contours.
-		args:
-			endo_stack (array): Original endocardial stack
-			epi_stack (array): Original epicardial stack
-			sastruct (dict): Setstruct from the SEGMENT MAT file
-			rv_insertion_pts (array): RV points indicated in the SEGMENT file
-			septal_slice (integer): The slice containing the rv points
-			apex_base_pts (array): The points from the long-axis image indicating apex and base
-			scar_stack (array): Original scar point stack
-		returns:
-			abs_shifted (array): Shifted apex, basal, and septal points
-			endo (array): Modified endocardial contours
-			epi (array): Modified epicardial contours
-			axis_center (array): Center of slice by apex-base axis calculation
-			scar_all (array): Shifted scar points to align with new endo and epi contours
-		"""
-		# Pull elements from passed args
-		kept_slices = sastruct['KeptSlices']
-		apex_pts = apex_base_pts[-2].reshape([1, 3])
-		base_pts = apex_base_pts[-1].reshape([1, 3])
-		septal_pts = rv_insertion_pts[(2, 0, 1), :]
-		# Calculate the z-orientation and store it in the m array
-		cine_z_orientation = np.cross(sastruct['ImageOrientation'][0:3], sastruct['ImageOrientation'][3:6])
-		cine_m = np.array([sastruct['ImageOrientation'][3:6], sastruct['ImageOrientation'][0:3], cine_z_orientation])
-		# Multiply the xyz parts of the stack by the m array and store
-		transform_endo = np.transpose(cine_m@np.transpose(endo_stack[:, 0:3]))
-		transform_epi = np.transpose(cine_m@np.transpose(epi_stack[:, 0:3]))
-		transform_abs = np.transpose(cine_m@np.transpose(np.append(apex_pts, np.append(base_pts, septal_pts, axis=0), axis=0)))
-		if scar_stack.size:
-			scar_z_orientation = np.cross(sastruct['ImageOrientation'][0:3], sastruct['ImageOrientation'][3:6])
-			scar_m = np.array([sastruct['ImageOrientation'][3:6], sastruct['ImageOrientation'][0:3], scar_z_orientation])
-			transform_scar = np.transpose(scar_m@np.transpose(scar_stack[:, 0:3]))
-		# Calculate the apex-base elements from the transformed abs points
-		ab_dist = transform_abs[1, :] - transform_abs[0, :]
-		ab_x = [transform_abs[0, 0] + (ab_dist[0]*(item/100)) for item in list(range(101))]
-		ab_y = [transform_abs[0, 1] + (ab_dist[1]*(item/100)) for item in list(range(101))]
-		ab_z = [transform_abs[0, 2] + (ab_dist[2]*(item/100)) for item in list(range(101))]
-		# Generate a list of z values (by slice)
-		z_loc = [transform_endo[np.where(endo_stack[:, 4] == cur_slice)[0][0], 2] for cur_slice in kept_slices]
-		# Calculate the m-array for the each slice and store in a list
-		m_slices = [(z_loc_cur - transform_abs[0,2])/ab_dist[2] for z_loc_cur in z_loc]
-		# Calculate the apex-base axis based on the slice m values and ab_dist
-		ba_axis_x = [m_slice * ab_dist[0] + transform_abs[0, 0] for m_slice in m_slices]
-		ba_axis_y = [m_slice * ab_dist[1] + transform_abs[0, 1] for m_slice in m_slices]
-		ba_axis_intercept = np.transpose(np.array([ba_axis_x, ba_axis_y, z_loc]))
-		#Set up lists before appending values
-		slice_center = []
-		center_axis_diff = []
-		endo_shifted = [None] * transform_endo.shape[0]
-		epi_shifted = [None] * transform_epi.shape[0]
-		axis_center = []
-		center_axis_diff = []
-		if scar_stack.size:
-			scar_shifted = [None] * transform_scar.shape[0]
-		# Iterate through and calculate the new endo and epi values
-		for i in range(len(kept_slices)):
-			# Pull the current slice and find which values in the stack are in the correct slice
-			cur_slice = kept_slices[i]
-			slice_endo_inds = np.where(endo_stack[:, 4] == cur_slice)[0]
-			slice_epi_inds = np.where(epi_stack[:, 4] == cur_slice)[0]
-			# Get the center of the slice for both epicardial center (slice) and apex-base line (axis)
-			slice_center.append(np.mean(transform_epi[slice_epi_inds, :], axis=0))
-			axis_center.append(ba_axis_intercept[i, :])
-			# Calculate the difference between slice center and axis center
-			center_axis_diff.append(slice_center[i] - axis_center[i])
-			# Shift the slices by the difference in centers and shift, to align the centers
-			for j in slice_endo_inds:
-				endo_shifted[j] = transform_endo[j] - center_axis_diff[i]
-			for j in slice_epi_inds:
-				epi_shifted[j] = transform_epi[j] - center_axis_diff[i]
-			if scar_stack.size:
-				slice_scar_inds = np.where(scar_stack[:, 4] == cur_slice)[0]
-				for j in slice_scar_inds:
-					scar_shifted[j] = transform_scar[j] - center_axis_diff[i]
-		# Get the new septal slice by calculating the adjustment from the topmost slice
-		septal_slice_new = int(septal_slice[0][0] - endo_stack[0, 4] + 1)
-		# Calculate the array to subtract from transform_abs to get the shifted apex, basal, and septal points
-		sub_arr = np.array([[0, 0, 0], [0, 0, 0], [center_axis_diff[septal_slice_new][0], center_axis_diff[septal_slice_new][1], 0], 
-			[center_axis_diff[septal_slice_new][0], center_axis_diff[septal_slice_new][1], 0], [center_axis_diff[septal_slice_new][0], center_axis_diff[septal_slice_new][1], 0]])
-		abs_shifted = transform_abs - sub_arr
-		
-		# Select data and transform to array
-		endo = [np.array(endo_shifted)[np.where(endo_stack[:, 4] == jz)[0]] for jz in range(1, 1+int(max(endo_stack[:, 4])))]
-		epi = [np.array(epi_shifted)[np.where(epi_stack[:, 4] == jz)[0]] for jz in range(1, 1+int(max(endo_stack[:, 4])))]
-		if scar_stack.size:
-			scar_all = [np.array(scar_shifted)[np.where(scar_stack[:, 4] == jz)[0]] for jz in range(1, 1+int(max(endo_stack[:, 4])))]
-			return([abs_shifted, endo, epi, axis_center, scar_all])
-		else:
-			return([abs_shifted, endo, epi, axis_center])
-		
+
 	def _shiftPolarCartesian(self, endo_polar, epi_polar, endo, epi, kept_slices, axis_center, wall_thickness):
 		"""Shift polar array into cartesian coordinates
 		
