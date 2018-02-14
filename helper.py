@@ -10,6 +10,7 @@ Created on Wed Feb 14 11:07:25 2017
 
 import scipy.io as spio
 import numpy as np
+import scipy as sp
 
 class ImportHelper():
 	
@@ -171,3 +172,190 @@ class StackHelper():
 			return([abs_shifted, endo, epi, axis_center, scar_all])
 		else:
 			return([abs_shifted, endo, epi, axis_center])
+			
+	@staticmethod
+	def transformStack(setstruct, slice_number=0, layer='endo'):
+		"""Perform the actual stack rotation and calculate the rotation matrix.
+		
+		args:
+			setstruct (dict): setstruct output from the SEGMENT file
+			slice_number (int): The slice number to be used for transformation
+			layer (string): Which layer to run through transformation
+		"""
+		# Pull x_pix, y_pix, and set run_xyz based on layer selection
+		if layer == 'endo':
+			x_pix = setstruct['endo_x'][:,slice_number,:]
+			y_pix = setstruct['endo_y'][:,slice_number,:]
+			run_xyz = True
+		elif layer == 'epi':
+			x_pix = setstruct['epi_x'][:,slice_number,:]
+			y_pix = setstruct['epi_y'][:,slice_number,:]
+			run_xyz = True
+		elif layer == 'mask':
+			x_pix = setstruct['mask_x'][:,slice_number,:]
+			y_pix = setstruct['mask_y'][:,slice_number,:]
+			run_xyz = np.isnan(sum(sum(setstruct['mask_x'][:,slice_number,:]))) < 1
+		elif layer == 'long':
+			run_xyz = False
+		else:
+			print('Incorrect Layer Selection. Defaulting to endo.')
+			x_pix = setstruct['endo_x'][:,slice_number,:]
+			y_pix = setstruct['endo_y'][:,slice_number,:]
+			run_xyz = True
+		# If endo, epi, or scar where there are no NaN values:
+		if run_xyz:
+			# Round the x_pix and y_pix arrays
+			x_pix_round = np.round(x_pix)
+			y_pix_round = np.round(y_pix)
+			# Set up lists that need to be altered during the loop
+			perim_length = [None] * x_pix_round.shape[0]
+			xy_pts = [None] * x_pix_round.shape[0]
+			for i in range(x_pix_round.shape[0]):
+				# If the layer isn't scar and there are NaN values in the rounded x_pix
+				#		Set the current point to all NaN and skip the rest of the loop
+				if (not layer == 'mask') and (np.any(np.isnan(x_pix_round[:,i]))):
+					xy_pts[i] = [np.nan, np.nan, np.nan]
+					continue
+				# Concatentate x_pix and y_pix into a single array
+				xy_pix_round = np.array([x_pix_round[i,:].tolist(), y_pix_round[i,:].tolist()])
+				# If the layer is scar, set the current perim_length point to the 2nd dimension size of xy_pix_round
+				#		Otherwise, grab the unique points and then the size of the 2nd dimension
+				if layer == 'mask':
+					perim_length[i] = xy_pix_round.shape[1]
+				else:
+					perim_length[i] = ((np.unique(xy_pix_round,axis=1)).shape)[1]
+				# Set perim points as linearly-spaced series of points from 0 to 1, with x_pix.shape[1]+1 number of points
+				perim_pts = np.linspace(0,1,x_pix.shape[1]+1)
+				# The interp points should be based on the value stored earlier in perim_length, +1
+				interp_perim_pts = np.linspace(0,1,perim_length[i]+1)
+				# Convert x_pix and y_pix to lists
+				x_pix_arr = x_pix[i,:].tolist()
+				y_pix_arr = y_pix[i,:].tolist()
+				# Put the x_pix and y_pix lists into a new array together
+				pix_arr = np.array([x_pix_arr, y_pix_arr])
+				if layer == 'mask':
+					# Sort the pix_arr array, putting 0 values at the bottom of the list
+					#		Primary sort is along the second column, secondary sort along the first
+					#		The conversion to and from NaN puts 0 values at the end of the list instead of the front
+					pix_arr[pix_arr == 0] = np.nan
+					pix_arr = pix_arr[:, np.argsort(pix_arr[1], kind='mergesort')]
+					pix_arr[np.isnan(pix_arr)] = 0
+				# Set perim_xy_pts to be pix arr, with the first point repeated at the end
+				pix_append = np.reshape(pix_arr[:, 0], [2,1])
+				perim_xy_pts = np.append(pix_arr.transpose(),pix_append.transpose(),axis=0)
+				# Define a cubic interpolation function based on perim_pts and perim_xy_pts
+				interp_func = sp.interpolate.interp1d(perim_pts,perim_xy_pts,kind='cubic',axis=0)
+				# Run the interpolation function on interp_perim_pts to get interp_xy_pts
+				#		This is the xy points interpolated along the new spacing
+				interp_xy_pts = interp_func(interp_perim_pts)
+				# Store the interpolated xy points, minus the last value (repeated from first)
+				xy_pts[i] = np.array(interp_xy_pts[0:interp_xy_pts.shape[0]-1,:])
+		# Pull values from the setstruct dict
+		x_resolution = setstruct['ResolutionX']
+		y_resolution = setstruct['ResolutionY']
+		image_position = setstruct['ImagePosition']
+		image_orientation = setstruct['ImageOrientation']
+		# Pull the image orientation in x and y, then the z is the cross-product
+		x_image_orientation = image_orientation[3:6]
+		y_image_orientation = image_orientation[0:3]
+		z_image_orientation = np.cross(y_image_orientation, x_image_orientation)
+		slice_thickness = setstruct['SliceThickness']
+		slice_gap = setstruct['SliceGap']
+		# Set the z offset (always 0 in long-axis)
+		if layer == 'long':
+			z_offset = 0
+		else:
+			z_offset = slice_number
+		if run_xyz:
+			xyz_pts = xy_pts
+			# If z points are used, add a new column to xyz_pts
+			#		This column is entirely equal to the z_offset
+			for i in range(x_pix_round.shape[0]):
+				z_pix = -z_offset*np.ones([perim_length[i],1])
+				if (layer == 'mask') or (not np.any(np.isnan(xy_pts[i].flatten()))):
+					z_pix = z_pix.reshape([z_pix.shape[0], 1])
+					xyz_pts[i] = np.append(xyz_pts[i], z_pix, axis=1)
+					xyz_shape = xyz_pts[i].shape
+		# Set t_o as a 4x4 identity matrix except the final column is [-1, -1, 0, 1]
+		t_o = np.identity(4)
+		t_o[:,3] = [-1, -1, 0, 1]
+		# Set s_eye as an identity matrix except the first 3 points on the diagonal are:
+		#		x_resolution, y_resolution, slice_thickness+slice_gap
+		s_eye = np.identity(4)
+		s_eye[0,0] = x_resolution
+		s_eye[1,1] = y_resolution
+		s_eye[2,2] = slice_thickness + slice_gap
+		# Set r_eye as a 4x4 identity matrix except the upper right corner is a 3x3 transposed orientation matrix
+		r_eye = np.identity(4)
+		r_eye[0:3,0:3] = np.transpose([x_image_orientation[:], y_image_orientation[:], z_image_orientation[:]])
+		# Set t_ipp to an identity matrix except the first 3 points of the final column are the image position
+		t_ipp = np.identity(4)
+		t_ipp[0:3,3] = image_position
+		# Multiply t_ipp, r_eye, s_eye, and t_o and store as m_arr
+		m_arr = t_ipp@r_eye@s_eye@t_o
+		if run_xyz:
+			for i in range(x_pix_round.shape[0]):
+				# As long as there are no NaN values:
+				if ~np.any(np.isnan(xyz_pts[i].flatten())):
+					try:
+						# Append a column of ones and multiply xyz_pts by the array defined above
+						mult_arr = np.transpose(np.append(xyz_pts[i], np.ones([xyz_pts[i].shape[0], 1]), axis=1))
+						X = np.transpose(m_arr@mult_arr)
+					except:
+						print('Error encountered.')
+						continue
+					# Remove the column of ones at the end and store in xyz_pts
+					X = X[:,0:3]
+					xyz_pts[i] = X
+		if layer == 'mask':
+			# Return values if scar is the current layer: xyz_pts, m_arr
+			if not run_xyz:
+				xyz_pts[0] = [None, None, None]
+			return([xyz_pts, m_arr])
+		if layer == 'epi':
+			# Return values if epi is the current layer: xyz_pts, m_arr
+			return([xyz_pts, m_arr])
+		# Set values before use
+		pp_slice = None
+		time_id = None
+		cur_arr = np.array(setstruct['EndoPinX'][:])
+		# Set z_offset to 0 if EndoPins have no timepoint changes
+		if len(cur_arr.shape) < 2:
+			x_pinpts = np.array(setstruct['EndoPinX'][:])
+			y_pinpts = np.array(setstruct['EndoPinY'][:])
+			z_offset_pp = 0
+		else:
+			# Set the timepoint based on where the endo pinpoints are non-zero
+			time_slice = np.where(cur_arr)
+			# If there is more than one timepoint, choose the first one
+			#		The first dimension in cur_arr is time, the second is slices
+			if len(time_slice) > 1:
+				time_id = time_slice[0][0]
+				pp_slice = time_slice[1][0]
+			else:
+				# If there aren't multiple timepoints, just take the slice
+				time_id = None
+				pp_slice= time_slice[0][0]
+			z_offset_pp = pp_slice
+			# Pull the pinpoints from the structures based on time data
+			if time_id == None:
+				x_pinpts = cur_arr[pp_slice]
+				y_pinpts = np.array(setstruct['EndoPinY'])[pp_slice]
+			else:
+				x_pinpts = cur_arr[time_id][pp_slice]
+				y_pinpts = np.array(setstruct['EndoPinY'])[time_id][pp_slice]
+		# Round pinpoints and append the z offset
+		pinpts_round = [np.round(x_pinpts), np.round(y_pinpts)]
+		z_pix = -z_offset_pp * np.ones([len(x_pinpts)])
+		pinpts_round.append(z_pix)
+		# Append a column of ones, multiply by the m_arr as defined above, and remove ones
+		pinpts_round.append(np.ones([len(x_pinpts)]))
+		pp = np.transpose(np.array(m_arr)@np.array(pinpts_round))
+		pp = pp[:,0:3]
+		if layer == 'long':
+			# Return if layer is long-axis: pinpoints (pp), m_arr
+			returnList = [pp, m_arr]
+		else:
+			# Return if layer is endocardial: xyz_pts, pinpoints (pp), m_arr
+			returnList = [xyz_pts, pp, m_arr]
+		return(returnList)
