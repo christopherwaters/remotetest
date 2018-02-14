@@ -22,19 +22,19 @@ class ConfocalModel():
 	"""Model class to hold confocal microscopy images and format them to generate a mesh to align with MRI data.
 	"""
 
-	def __init__(self):
+	def __init__(self, confocal_dir):
 		"""Initialize the model made to import confocal microscopy data.
 		"""
-		root = tk.Tk()
-		frame = tk.Frame(root)
-		frame.pack()
+		#root = tk.Tk()
+		#frame = tk.Frame(root)
+		#frame.pack()
 		
 		# Select folder to import for confocal data
-		confocal_folder = filedialog.askdirectory(title='Select confocal microscopy folder.')
-		root.destroy()
+		#confocal_folder = filedialog.askdirectory(title='Select confocal microscopy folder.')
+		#root.destroy()
 		
 		# Get all TIFF files in the directory
-		self.tif_files = glob.glob(os.path.join(confocal_folder, '*.tif'))
+		self.tif_files = glob.glob(os.path.join(confocal_dir, '*.tif'))
 		self.raw_images = [None]*len(self.tif_files)
 		
 		# Open each image file using PIL
@@ -83,7 +83,6 @@ class ConfocalModel():
 		image_x, image_y = images[0].size
 		image_z = images[0].n_frames
 		image_size = [image_x, image_y, image_z]
-		print(image_size)
 		return(image_grid)
 	
 	def validateIntensity(self):

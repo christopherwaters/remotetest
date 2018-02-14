@@ -175,6 +175,9 @@ class modelGUI(tk.Frame):
 		self.postview_open_button = ttk.Button(text='Launch PostView', state='disabled', command= lambda: self.openPostview())
 		self.postview_open_button.grid(row=11, column=4)
 		
+		# Add buttons to generate a confocal model object
+		ttk.Button(text='Generate Confocal Model', command= lambda: self.createConfocalModel(confocal_dir_entry)).grid(row=5, column=7, columnspan=2)
+		
 	def openFileBrowser(self, entry_box, multi='False'):
 		"""Open a file browser window and assign the file name to the passed entry box.
 		Allows various options for type of file browser to be launched.
@@ -289,6 +292,18 @@ class modelGUI(tk.Frame):
 			self.dense_fe_button.configure(state='normal')
 		else:
 			self.dense_fe_button.configure(state='disabled')
+	
+	def createConfocalModel(self, confocal_dir_entry):
+		confocal_dir = confocal_dir_entry.get()
+		if confocal_dir == '':
+			messagebox.showinfo('No Directory', 'Please select a directory for confocal images.')
+			return(False)
+		try:
+			self.confocal_model = confocalmodel.ConfocalModel(confocal_dir)
+			self.confocal_model.stitchImages()
+		except:
+			messagebox.showinfo('Failed', 'Confocal model creation failed. Check inputs and try again.')
+			return(False)
 	
 	def cineTimeChanged(self):
 		"""Function to respond to timepoint adjustments in the base cine mesh / model
