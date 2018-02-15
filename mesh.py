@@ -13,11 +13,7 @@ import numpy as np
 import scipy as sp
 import math
 import warnings
-import matplotlib.pyplot as mplt
 import matplotlib.path as path
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.patches import Polygon
-import subprocess
 from cardiachelpers import stackhelper
 from cardiachelpers import mathhelper
 from cardiachelpers import meshhelper
@@ -279,135 +275,6 @@ class Mesh():
 		self.pent = pent
 		
 		return([hex, pent])
-		
-	def renderPatchMesh(self, nodes, elem_con_matrix, data=False, color=False, title='Mesh Rendering'):
-		"""Should visualize the finite elements. Currently not implemented due to limitations."""
-		if data:
-			data_col = data / max(data)
-		else:
-			data_col = np.zeros(np.append(elem_con_matrix.shape, 1))
-		
-		fig = mplt.figure()
-		fig.addsubplot(111, projection='3d')
-		
-		for jz in range(elem_con_matrix.shape[0]):
-			face = np.array([[1, 2, 3, 4], [1, 5, 6, 2], [2, 6, 7, 3], [6, 5, 8, 7], [3, 7, 8, 4], [1, 4, 8, 5]])
-	
-	def labelScarElems(self, scar_contour, conn_mat = 'hex'):
-		"""Get a matrix indicating which elements are contained within the scar contour
-		
-		args:
-			scar_contour (array): The x, y, z array for the scar contour, from the MRIModel object
-			conn_mat (string): Indicates which connectivity matrix to use (hex or pent)
-		returns:
-			scar_node_inds (array): The indices of the element connectivity matrix that are scar
-			center_matrix (array): The center of the elements defined by conn_mat that are in the scar
-		"""
-		# Convert the scar contour to prolate coordinates
-		scar_contour = [scar_contour_i for scar_contour_i in scar_contour if scar_contour_i.size > 0]
-		scar_vstack = np.vstack(tuple(scar_contour))
-		scar_vstack = np.dot((scar_vstack - np.array([self.origin for i in range(scar_vstack.shape[0])])), np.transpose(self.transform))
-		
-		# Get connectivity matrix and create scar matrix based on size
-		elem_con = self.pent if conn_mat == 'pent' else self.hex
-		scar_mat = [False] * elem_con.shape[0]
-		
-		# Create matrix of node centers (center in prolate, convert back to cartesian)
-		center_matrix = []
-		for i in range(elem_con.shape[0]):
-			node_inds = elem_con[i, :]
-			cur_elem_nodes = self.nodes[node_inds.tolist()]
-			cur_elem_center = np.mean(cur_elem_nodes, axis=0)
-			center_matrix.append(cur_elem_center.tolist())
-		center_matrix = np.array(center_matrix)
-		center_matrix_orig = center_matrix
-
-		# Get scar Z-range
-		scar_z_min = np.min(-scar_vstack[:, 0])
-		scar_z_max = np.max(-scar_vstack[:, 0])
-		
-		# Remove nodes outside of the scar z-range
-		elems_in_z = np.argwhere((-center_matrix[:, 0] <= scar_z_max) & (-center_matrix[:, 0] >= scar_z_min))
-		center_matrix = center_matrix[elems_in_z, :]
-		num_pts_slice = scar_contour[0].shape[0]
-		center_matrix = np.squeeze(center_matrix)
-		elem_inds = []
-		
-		# Loop through elements remaining and remove if outside of the scar region
-		for elem_center in center_matrix.tolist():
-			# Define which known slices are established above and below
-			ind_above = None
-			ind_below = None
-			for i in range(len(scar_contour)):
-				scar_slice_cur = scar_vstack[i*num_pts_slice:(i+1)*num_pts_slice, :]
-				scar_slice_cur_mean = np.mean(scar_slice_cur, axis=0)
-				# Define the indices above and below, set equal if you are inside the slice
-				if round(-scar_slice_cur_mean[0], 1) == round(-elem_center[0], 1):
-					ind_above = i
-					ind_below = i
-					break
-				elif round(-scar_slice_cur_mean[0], 1) > round(-elem_center[0], 1):
-					ind_above = i
-				else:
-					ind_below = i
-					break
-			# Calculate scar contours based on z-axis position
-			if not ind_below and ind_above == len(scar_contour)-1:
-				ind_below = ind_above
-			if ind_below == ind_above:
-				# If currently aligned with a scar layer, use that layer only
-				scar_layer = scar_vstack[ind_above*num_pts_slice:(ind_above+1)*num_pts_slice, :]
-				scar_pts = np.column_stack((scar_layer[:, 2], scar_layer[:, 1]))
-			else:
-				scar_above = scar_vstack[ind_above*num_pts_slice:(ind_above+1)*num_pts_slice, :]
-				scar_below = scar_vstack[ind_below*num_pts_slice:(ind_below+1)*num_pts_slice, :]
-				# Interpolate contours at new z value
-				above_z = np.mean(-scar_above[:, 0])
-				below_z = np.mean(-scar_below[:, 0])
-				# The interpolation bounds are the two layers above and below
-				interp_arr = [below_z, above_z]
-				# Develop interpolation functions in cartesian coordinates
-				x_interp_func = sp.interpolate.interp1d(interp_arr, np.column_stack((scar_below[:, 2], scar_above[:, 2])))
-				y_interp_func = sp.interpolate.interp1d(interp_arr, np.column_stack((scar_below[:, 1], scar_above[:, 1])))
-				# Calculate new x and y values at z
-				x_new_z = x_interp_func(-elem_center[0])
-				y_new_z = y_interp_func(-elem_center[0])
-				# Combine new points
-				scar_pts = np.column_stack((x_new_z, y_new_z))	
-			# Convert the values to polar to compare radial and circumferential extent
-			new_z_theta, new_z_rho = mathhelper.cartToPol(scar_pts[:, 0], scar_pts[:, 1])
-			elem_center_theta, elem_center_rho = mathhelper.cartToPol(elem_center[2], elem_center[1])
-			theta_min, theta_max, direction = mathhelper.getAngleRange(new_z_theta)
-			# If the scar is min->max in normal order, direction is True
-			# 	Delete elements outside of the circumferential extent, then move to the next element
-			if direction:
-				if elem_center_theta > theta_max or elem_center_theta < theta_min:
-					center_matrix = np.delete(center_matrix, np.where(np.bitwise_and(center_matrix[:, 0] == elem_center[0], center_matrix[:, 1] == elem_center[1], center_matrix[:, 2] == elem_center[2]))[0], axis=0)
-					continue
-			else:
-				if theta_max < elem_center_theta < theta_min:
-					center_matrix = np.delete(center_matrix, np.where(np.bitwise_and(center_matrix[:, 0] == elem_center[0], center_matrix[:, 1] == elem_center[1], center_matrix[:, 2] == elem_center[2]))[0], axis=0)
-					continue
-			# Get the indices closest on the left and right for both inner and outer traces
-			theta_inner = new_z_theta[:int(num_pts_slice/2)]
-			theta_outer = new_z_theta[int(num_pts_slice/2):]
-			theta_inner_ind = np.where(np.diff(np.sign(theta_inner - elem_center_theta)))[0][0]
-			theta_inner_inds = [theta_inner_ind, theta_inner_ind+1]
-			theta_outer_ind = np.where(np.diff(np.sign(theta_outer - elem_center_theta)))[0][0]+int(num_pts_slice/2)
-			theta_outer_inds = [theta_outer_ind, theta_outer_ind+1]
-			# Calculate rho of the inner and outer traces, giving the range that is "in-scar"
-			rho_inner = np.mean(new_z_rho[theta_inner_inds])
-			rho_outer = np.mean(new_z_rho[theta_outer_inds])
-			# Delete elements that are outside of the scar range, then continue to the next element
-			if not (rho_inner <= elem_center_rho <= rho_outer):
-				center_matrix = np.delete(center_matrix, np.where(np.bitwise_and(center_matrix[:, 0] == elem_center[0], center_matrix[:, 1] == elem_center[1], center_matrix[:, 2] == elem_center[2]))[0], axis=0)
-				continue
-			# All remaining elements are in the scar trace, so store the indices based on element connectivity matrix index
-			elem_inds = np.append(elem_inds, np.where(np.bitwise_and(center_matrix_orig[:, 0] == elem_center[0], center_matrix_orig[:, 1] == elem_center[1], center_matrix_orig[:, 2] == elem_center[2]))[0])
-		
-		# Convert the indices to integers so that they may be used to automatically index
-		scar_node_inds = elem_inds.astype(int)
-		return([scar_node_inds, center_matrix])
 	
 	def assignScarElems(self, scar_contour, conn_mat='hex'):
 		"""Get a matrix indicating which elements are contained within the scar contour
@@ -429,7 +296,7 @@ class Mesh():
 		scar_vstack = np.vstack(tuple(scar_contour))
 		scar_vstack = np.dot((scar_vstack - np.array([self.origin for i in range(scar_vstack.shape[0])])), np.transpose(self.transform))
 		
-		self.nodes_in_scar = self._assignRegionNodes(scar_vstack, scar_edge_spacing, num_slices)
+		self.nodes_in_scar = meshhelper.assignRegionNodes(self.nodes, scar_vstack, scar_edge_spacing, num_slices, self.focus)
 		
 		# Get connectivity matrix
 		elem_con = self.pent if conn_mat == 'pent' else self.hex
@@ -559,61 +426,6 @@ class Mesh():
 			out_file.writelines(elem_strings_formatted)
 			out_file.writelines([element_end_str, geometry_end_str, fe_end_str])
 		return(output_file_name)
-	
-	def displayMeshPostview(self, file_name):
-		"""Launch PostView with specific file selected.
-		"""
-		p = subprocess.Popen(['C://Program Files/postview-2.1.0/PostView2.exe', file_name])
-		return(p)
-		
-	def _assignRegionNodes(self, region_contour, contour_edge_spacing, num_slices):
-		"""Generalized method to label which elements fall within a region contour.
-		
-		Region contour should be spaced evenly per slice, with an equal number of points on the outer layer and inner layer. The point distance between the circumferential extents of the region should be given with contour edge spacing.
-		"""
-		# Determine mu error buffer should be used
-		err_val = 0
-		
-		# Convert nodes to cartesian for measurement
-		nodes_prol_mu, nodes_prol_nu, nodes_prol_phi = mathhelper.cart2prolate(self.nodes[:, 0], self.nodes[:, 1], self.nodes[:, 2], self.focus)
-		nodes_prol = np.column_stack((nodes_prol_mu, nodes_prol_nu, nodes_prol_phi))
-		
-		# Convert region to prolate
-		region_mu, region_nu, region_phi = mathhelper.cart2prolate(region_contour[:, 0], region_contour[:, 1], region_contour[:, 2], self.focus)
-		region_prol = np.column_stack((region_mu, region_nu, region_phi))
-		region_prol_edges = region_prol[0::contour_edge_spacing, :]
-		
-		# Get polygonal path for the region edges
-		region_prol_polygon = np.vstack((region_prol_edges[0::2, :], region_prol_edges[:0:-2, :], region_prol_edges[0, :]))
-		region_polygon = path.Path(np.column_stack((region_prol_polygon[:, 2], region_prol_polygon[:, 1])))
-		
-		# Determine points inside region contour
-		nodes_in_region = np.where(region_polygon.contains_points(np.column_stack((nodes_prol[:, 2], nodes_prol[:, 1]))))[0]
-		
-		# Get surface plots for inner and outer region surfaces
-		base_list = list(range(contour_edge_spacing))
-		sum_list = [[contour_edge_spacing*2*i]*contour_edge_spacing for i in range(num_slices)]
-		region_inds_inner = []
-		for i in range(len(sum_list)):
-			region_inds_inner = np.append(region_inds_inner, np.add(base_list, sum_list[i]))
-		region_inds_inner = [int(s_i) for s_i in region_inds_inner]
-		region_inds_outer = [region_inds_inner_i + contour_edge_spacing for region_inds_inner_i in region_inds_inner]
-		
-		# Interpolate base on grid placement to get inner and outer values at each node
-		inner_pt_vals = sp.interpolate.griddata(np.column_stack((region_prol[region_inds_inner, 2], region_prol[region_inds_inner, 1])), region_prol[region_inds_inner, 0], np.column_stack((nodes_prol[nodes_in_region, 2], nodes_prol[nodes_in_region, 1])), method='cubic')
-		outer_pt_vals = sp.interpolate.griddata(np.column_stack((region_prol[region_inds_outer, 2], region_prol[region_inds_outer, 1])), region_prol[region_inds_outer, 0], np.column_stack((nodes_prol[nodes_in_region, 2], nodes_prol[nodes_in_region, 1])), method='cubic')
-		mu_range = np.column_stack((inner_pt_vals, outer_pt_vals))
-		
-		# Error factor if needed
-		mu_range_err = [err_val*abs(mu_range[i, 1] - mu_range[i, 0]) for i in range(mu_range.shape[0])]
-		
-		# Find which nodes are within the mu extent at the specified phi, nu points
-		nodes_in_mu = np.where([((np.min(mu_range[i, :])-mu_range_err[i]) <= nodes_prol[nodes_in_region[i], 0]) & ((np.max(mu_range[i, :])+mu_range_err[i]) >= nodes_prol[nodes_in_region[i], 0]) for i in range(len(nodes_in_region))])[0]
-		
-		# Get final node values within the 3-d region
-		final_node_inds = nodes_in_region[nodes_in_mu]
-		
-		return(final_node_inds)
 	
 	def _fitBicubicData(self, data, focus, mesh_density='4x2', smooth=True, constraints=True, compute_errors=True):
 		"""Bicubic fit of x,y,z data to a prolate mesh

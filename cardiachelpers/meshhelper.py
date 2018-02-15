@@ -1,5 +1,8 @@
 import numpy as np
+import scipy as sp
 import math
+from cardiachelpers import mathhelper
+from matplotlib import path
 
 def prepData(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts):
 	"""Reorganize endo and epi data for processing.
@@ -182,3 +185,52 @@ def generateInd(size_nodal_mu, corner13theta, corner24theta, corner12mu, corner3
 	# Convert list from floats to ints
 	ind = [int(ind_i) for ind_i in ind]
 	return(ind)
+	
+def assignRegionNodes(nodes, region_contour, contour_edge_spacing, num_slices, focus):
+	"""Generalized method to label which elements fall within a region contour.
+	
+	Region contour should be spaced evenly per slice, with an equal number of points on the outer layer and inner layer. The point distance between the circumferential extents of the region should be given with contour edge spacing.
+	"""
+	# Determine mu error buffer should be used
+	err_val = 0
+	
+	# Convert nodes to cartesian for measurement
+	nodes_prol_mu, nodes_prol_nu, nodes_prol_phi = mathhelper.cart2prolate(nodes[:, 0], nodes[:, 1], nodes[:, 2], focus)
+	nodes_prol = np.column_stack((nodes_prol_mu, nodes_prol_nu, nodes_prol_phi))
+	
+	# Convert region to prolate
+	region_mu, region_nu, region_phi = mathhelper.cart2prolate(region_contour[:, 0], region_contour[:, 1], region_contour[:, 2], focus)
+	region_prol = np.column_stack((region_mu, region_nu, region_phi))
+	region_prol_edges = region_prol[0::contour_edge_spacing, :]
+	
+	# Get polygonal path for the region edges
+	region_prol_polygon = np.vstack((region_prol_edges[0::2, :], region_prol_edges[:0:-2, :], region_prol_edges[0, :]))
+	region_polygon = path.Path(np.column_stack((region_prol_polygon[:, 2], region_prol_polygon[:, 1])))
+	
+	# Determine points inside region contour
+	nodes_in_region = np.where(region_polygon.contains_points(np.column_stack((nodes_prol[:, 2], nodes_prol[:, 1]))))[0]
+	
+	# Get surface plots for inner and outer region surfaces
+	base_list = list(range(contour_edge_spacing))
+	sum_list = [[contour_edge_spacing*2*i]*contour_edge_spacing for i in range(num_slices)]
+	region_inds_inner = []
+	for i in range(len(sum_list)):
+		region_inds_inner = np.append(region_inds_inner, np.add(base_list, sum_list[i]))
+	region_inds_inner = [int(s_i) for s_i in region_inds_inner]
+	region_inds_outer = [region_inds_inner_i + contour_edge_spacing for region_inds_inner_i in region_inds_inner]
+	
+	# Interpolate base on grid placement to get inner and outer values at each node
+	inner_pt_vals = sp.interpolate.griddata(np.column_stack((region_prol[region_inds_inner, 2], region_prol[region_inds_inner, 1])), region_prol[region_inds_inner, 0], np.column_stack((nodes_prol[nodes_in_region, 2], nodes_prol[nodes_in_region, 1])), method='cubic')
+	outer_pt_vals = sp.interpolate.griddata(np.column_stack((region_prol[region_inds_outer, 2], region_prol[region_inds_outer, 1])), region_prol[region_inds_outer, 0], np.column_stack((nodes_prol[nodes_in_region, 2], nodes_prol[nodes_in_region, 1])), method='cubic')
+	mu_range = np.column_stack((inner_pt_vals, outer_pt_vals))
+	
+	# Error factor if needed
+	mu_range_err = [err_val*abs(mu_range[i, 1] - mu_range[i, 0]) for i in range(mu_range.shape[0])]
+	
+	# Find which nodes are within the mu extent at the specified phi, nu points
+	nodes_in_mu = np.where([((np.min(mu_range[i, :])-mu_range_err[i]) <= nodes_prol[nodes_in_region[i], 0]) & ((np.max(mu_range[i, :])+mu_range_err[i]) >= nodes_prol[nodes_in_region[i], 0]) for i in range(len(nodes_in_region))])[0]
+	
+	# Get final node values within the 3-d region
+	final_node_inds = nodes_in_region[nodes_in_mu]
+	
+	return(final_node_inds)

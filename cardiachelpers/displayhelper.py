@@ -4,6 +4,7 @@ import matplotlib.pyplot as mplt
 from mpl_toolkits.mplot3d import Axes3D
 from cardiachelpers import meshhelper
 from cardiachelpers import mathhelper
+import subprocess
 
 def segmentRender(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, origin, transform, landmarks=True, ax=None, scar=None):
 	"""Display the segmentation contours and user-indicated points
@@ -245,3 +246,9 @@ def nodeRender(nodes, ax=None):
 	z = nodes[:, 0]
 	ax.scatter(x, y, -z)
 	return(ax)
+	
+def displayMeshPostview(file_name):
+	"""Launch PostView with specific file selected.
+	"""
+	p = subprocess.Popen(['C://Program Files/postview-2.1.0/PostView2.exe', file_name])
+	return(p)
