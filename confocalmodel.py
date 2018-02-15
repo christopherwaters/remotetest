@@ -17,6 +17,7 @@ import matplotlib.pyplot as mplt
 import glob
 from PIL import Image
 import os
+from cardiachelper import importhelper
 
 class ConfocalModel():
 	"""Model class to hold confocal microscopy images and format them to generate a mesh to align with MRI data.
@@ -25,13 +26,6 @@ class ConfocalModel():
 	def __init__(self, confocal_dir):
 		"""Initialize the model made to import confocal microscopy data.
 		"""
-		#root = tk.Tk()
-		#frame = tk.Frame(root)
-		#frame.pack()
-		
-		# Select folder to import for confocal data
-		#confocal_folder = filedialog.askdirectory(title='Select confocal microscopy folder.')
-		#root.destroy()
 		
 		# Get all TIFF files in the directory
 		self.tif_files = glob.glob(os.path.join(confocal_dir, '*.tif'))
@@ -70,7 +64,7 @@ class ConfocalModel():
 		if not images:
 			images = self.raw_images
 		# Get the image positions and pixel-micron conversion data
-		image_positions, column_dict = self._getImagePositions(self.tif_files)
+		image_positions, column_dict = importhelper.getImagePositions(self.tif_files)
 		# Create a grid to match the number of positions possible, then fill images into the grid
 		x_slots = np.unique(image_positions[:, 0])
 		y_slots = np.unique(image_positions[:, 1])
@@ -89,22 +83,3 @@ class ConfocalModel():
 		"""Adjust image intensity based on edge intensity of adacent images.
 		"""
 		pass
-		
-	def _getImagePositions(self, image_files=None):
-		"""Small function to pull image position data from Volocity-exported TIF files.
-		"""
-		if not image_files:
-			image_files = self.tif_files
-		data_categories = ['XLocationMicrons', 'YLocationMicrons', 'XCalibrationMicrons', 'YCalibrationMicrons']
-		image_positions = np.empty((len(image_files), len(data_categories)))
-		for file_num, tif_file in enumerate(image_files):
-			with open(tif_file, encoding='utf8', errors='ignore') as temp_file:
-				file_lines = temp_file.readlines()
-				for line in file_lines:
-					line_split = line.split('=')
-					if len(line_split) == 2:
-						if line_split[0] in data_categories:
-							image_positions[file_num, data_categories.index(line_split[0])] = float(line_split[1])
-							
-		column_dict = {data_categories[i] : i for i in range(len(data_categories))}
-		return([image_positions, column_dict])

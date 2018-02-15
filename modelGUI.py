@@ -397,7 +397,7 @@ class modelGUI(tk.Frame):
 			messagebox.showinfo('File Warning', 'File selected is not an FEBio file. Check file name and try again.')
 			return(False)
 		# Request PostView Launch
-		self.mri_mesh.displayMeshPostview(feb_file_name)
+		displayhelper.displayMeshPostview(feb_file_name)
 	
 	def intValidate(self, new_value):
 		"""Simple validation function to ensure an entry receives only int-able inputs or null
