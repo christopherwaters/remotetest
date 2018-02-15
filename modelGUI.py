@@ -14,6 +14,7 @@ import warnings
 import mrimodel
 import confocalmodel
 import mesh
+from cardiachelpers import displayhelper
 
 class modelGUI(tk.Frame):
 	"""Generates a GUI to control the Python-based cardiac modeling toolbox.
@@ -328,26 +329,26 @@ class modelGUI(tk.Frame):
 		# Pull timepoint from timepoint selection combobox
 		time_point = int(self.cine_timepoint_cbox.get())
 		# Plot overall cine segmentation data
-		mri_axes = self.mri_mesh.segmentRender(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts)
+		mri_axes = displayhelper.segmentRender(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, self.mri_mesh.origin, self.mri_mesh.transform)
 		# If desired, plot scar data
 		if self.scar_plot_bool.get() and self.mri_model.scar:
-			mri_axes = self.mri_mesh.displayScarTrace(self.mri_model.aligned_scar[time_point], ax=mri_axes)
+			mri_axes = displayhelper.displayScarTrace(self.mri_model.aligned_scar[time_point], self.mri_mesh.origin, self.mri_mesh.transform, ax=mri_axes)
 		# If desired, plot DENSE data
 		if self.dense_plot_bool.get() and self.mri_model.dense:
-			mri_axes = self.mri_mesh.displayDensePts(self.mri_model.dense_aligned_pts, self.mri_model.dense_slices, self.mri_model.dense_aligned_displacement, dense_plot_quiver=1, timepoint=int(self.dense_timepoint_cbox.get()), ax=mri_axes)
+			mri_axes = displayhelper.displayDensePts(self.mri_model.dense_aligned_pts, self.mri_model.dense_slices, self.mri_mesh.origin, self.mri_mesh.transform, self.mri_model.dense_aligned_displacement, dense_plot_quiver=1, timepoint=int(self.dense_timepoint_cbox.get()), ax=mri_axes)
 	
 	def plotMRIMesh(self):
 		"""Plots the mesh data as a surface plot, with display options
 		"""
 		# Plot surface contours of endocardium and epicardium
-		mesh_axes = self.mri_mesh.surfaceRender(self.mri_mesh.endo_node_matrix)
-		mesh_axes = self.mri_mesh.surfaceRender(self.mri_mesh.epi_node_matrix, mesh_axes)
+		mesh_axes = displayhelper.surfaceRender(self.mri_mesh.endo_node_matrix, self.mri_mesh.focus)
+		mesh_axes = displayhelper.surfaceRender(self.mri_mesh.epi_node_matrix, self.mri_mesh.focus, mesh_axes)
 		# Display node positions, if selected
 		if self.nodes_plot_bool.get():
-			mesh_axes = self.mri_mesh.nodeRender(self.mri_mesh.nodes, mesh_axes)
+			mesh_axes = displayhelper.nodeRender(self.mri_mesh.nodes, mesh_axes)
 		# Display scar locations, if available and desired
 		if self.scar_plot_bool.get() and self.mri_mesh.nodes_in_scar.size:
-			mesh_axes = self.mri_mesh.nodeRender(self.mri_mesh.nodes[self.mri_mesh.nodes_in_scar, :], ax=mesh_axes)
+			mesh_axes = displayhelper.nodeRender(self.mri_mesh.nodes[self.mri_mesh.nodes_in_scar, :], ax=mesh_axes)
 		elif self.scar_plot_bool.get() and not self.mri_mesh.nodes_in_scar.size:
 			# Warn if scar box selected, but elements unidentified.
 			messagebox.showinfo('Warning', 'Identify scar nodes before plotting to view.')

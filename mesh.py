@@ -88,188 +88,13 @@ class Mesh():
 		"""
 		
 		# Set up variables
-		data_endo, data_epi, self.focus, self.transform, self.origin = self._prepData(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts)
+		data_endo, data_epi, self.focus, self.transform, self.origin = meshhelper.prepData(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts)
 		
 		# Fit using a bicubic interpolation.
 		self.endo_node_matrix, _ = self._fitBicubicData(data_endo, self.focus, mesh_density=mesh_type)
 		self.epi_node_matrix, _ = self._fitBicubicData(data_epi, self.focus, mesh_density=mesh_type)
 		
 		return([self.endo_node_matrix, self.epi_node_matrix])
-		
-	def segmentRender(self, all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, landmarks=True, ax=None, scar=None):
-		"""Display the segmentation contours and user-indicated points
-		
-		args:
-			all_data_endo (array): All endocardial contour data including slice values.
-			all_data_epi (array): All epicardial contour data including slice values.
-			apex_pt (array): Apical point
-			basal_pt (array): Basal point
-			septal_pts (array): Septal points (including midpoint)
-			landmarks (bool): Whether to plot the pinpoints.
-			ax (mplotlib3d axes): Axes on which to plot (default None)
-		returns:
-			ax (mplotlib3d axes): The axes of the contour
-		"""
-		if not ax:
-			fig = mplt.figure()
-			ax = fig.add_subplot(111, projection='3d')
-		data_endo, data_epi, _, _, _ = self._prepData(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts)
-		# Subtract origin and transform data
-		apex_transform = np.dot((apex_pt - self.origin), np.transpose(self.transform))
-		basal_transform = np.dot((basal_pt - self.origin), np.transpose(self.transform))
-		septal_transform1 = np.dot((septal_pts[0, :] - self.origin), np.transpose(self.transform))
-		septal_transform2 = np.dot((septal_pts[1, :] - self.origin), np.transpose(self.transform))
-		septal_transform3 = np.dot((septal_pts[2, :] - self.origin), np.transpose(self.transform))
-		# Set up bins as the unique data in all_data_endo third column (the slices)
-		bins = np.unique(all_data_endo[:, 2])
-		for jz in range(bins.size):
-			# Get the indices that match the current bin and append then append the first value
-			tracing = np.where(all_data_endo[:, 2] == bins[jz])[0]
-			tracing = np.append(tracing, tracing[0])
-			# Pull x, y, z from endo and epi and plot
-			x = data_endo[tracing, 2]
-			y = data_endo[tracing, 1]
-			z = data_endo[tracing, 0]
-			ax.plot(x, y, -z, 'y-')
-			# Epi plotting
-			x = data_epi[tracing, 2]
-			y = data_epi[tracing, 1]
-			z = data_epi[tracing, 0]
-			ax.plot(x, y, -z, 'c-')
-		if landmarks:
-			# Plot the apex, basal, and septal points
-			ab = np.array([apex_transform, basal_transform])
-			si = np.array([septal_transform2, septal_transform3])
-			
-			ax.plot(ab[:, 2], ab[:, 1], -ab[:, 0], 'k-.')
-			ax.scatter(si[:, 2], si[:, 1], -si[:, 0], 'bo', s=50)
-			ax.scatter(septal_transform1[2], septal_transform1[1], -septal_transform1[0], 'ro', s=50)
-		
-		return(ax)
-		
-	def surfaceRender(self, nodal_mesh, ax=None):
-		"""Plot surface mesh on optionally-passed axes
-		
-		args:
-			nodal_mesh (array): Mesh to be plotted
-			ax (mplot3d axes object): Axes on which to plot the mesh
-		returns:
-			ax (mplot3d axes object): Axes containing the surface plot contained in a figure
-		"""
-		# If no axes were passed, generate new set of axes
-		if not ax:
-			fig = mplt.figure()
-			ax = fig.add_subplot(111, projection='3d')
-	
-		# Sort the mesh by first 3 columns
-		nodal_mesh = nodal_mesh[nodal_mesh[:, 0].argsort()]
-		nodal_mesh = nodal_mesh[nodal_mesh[:, 1].argsort(kind='mergesort')]
-		nodal_mesh = nodal_mesh[nodal_mesh[:, 2].argsort(kind='mergesort')]
-		
-		# Set up number of divisions and calculate e for each division (as a ratio)
-		num_div = 20
-		e = [i/num_div for i in range(num_div + 1)]
-		# Convert angular values from degrees to radians
-		rads = math.pi/180
-		nodal_mesh[:, 1:3] *= rads
-		# Store the shapes and sizes of the mesh values
-		m = nodal_mesh.shape[0]
-		size_nodal_nu = np.where(nodal_mesh[:, 2] == 0)[0].size
-		size_nodal_phi = m/size_nodal_nu
-		# Get the mu and theta values from the mesh
-		nodal_nu = nodal_mesh[:size_nodal_nu, 1]
-		nodal_phi = nodal_mesh[::size_nodal_nu, 2]
-		# Convert apex node from prolate to cartesian, then plot with scatter
-		if min(nodal_nu) == 0:
-			x, y, z = mathhelper.prolate2cart(nodal_mesh[0, 0], nodal_mesh[0, 1], nodal_mesh[0, 2], self.focus)
-			ax.scatter(z, y, -x)
-			start_nu = 1
-		else:
-			start_nu = 0
-		# Plot circumferential element boundaries
-		for i in range(start_nu, size_nodal_nu):
-			for j in range(int(size_nodal_phi)):
-				# Define nodal values for interpolation
-				if j == size_nodal_phi-1:
-					ind0 = i
-					p0 = 2*math.pi
-				else:
-					ind0 = (j+1)*size_nodal_nu + i
-					p0 = nodal_phi[j+1]
-				ind1 = (j)*size_nodal_nu + i
-				p1 = nodal_phi[j]
-				# Get mu and dM/dm1
-				m0 = nodal_mesh[ind0, 0]
-				dm0 = nodal_mesh[ind0, 3]
-				m1 = nodal_mesh[ind1, 0]
-				dm1 = nodal_mesh[ind1, 3]
-				# Convert to cartesian
-				n0x, n0y, n0z = mathhelper.prolate2cart(nodal_mesh[ind0, 0], nodal_mesh[ind0, 1], nodal_mesh[ind0, 2], self.focus)
-				# Plot the node
-				ax.scatter(n0z, n0y, -n0x)
-				# Plot the arc segments
-				for k in range(2, len(e)):
-					# Determine starting point to use
-					if k == 2:
-						pt_x, pt_y, pt_z = n0x, n0y, n0z
-					else:
-						pt_x, pt_y, pt_z = x_here, y_here, z_here
-					# Get lambda
-					hm0 = 1 - 3*(e[k]**2) + 2*(e[k]**3)
-					hdm0 = e[k]*(e[k] - 1)**2
-					hm1 = (e[k]**2)*(3 - 2*e[k])
-					hdm1 = (e[k]**2)*(e[k] - 1)
-					m = hm0 * m0 + hdm0 * dm0 + hm1 * m1 + hdm1 * dm1
-					# Get theta
-					p_here = p0 - e[k]*(p0 - p1)
-					# Convert to cartesian
-					x_here, y_here, z_here = mathhelper.prolate2cart(m, nodal_nu[i], p_here, self.focus)
-					# Create vectors
-					x = np.append(pt_x, x_here)
-					y = np.append(pt_y, y_here)
-					z = np.append(pt_z, z_here)
-					# Plot segments
-					ax.plot(z, y, -x, 'k-.')
-		# Plot longitudinal element boundaries
-		for i in range(int(size_nodal_phi)):
-			for j in range(size_nodal_nu-1):
-				# Define nodal values needeed for interpolation
-				ind0 = i*size_nodal_nu + j
-				ind1 = ind0 + 1
-				n0 = nodal_nu[j]
-				n1 = nodal_nu[j+1]
-				# Get lambda and dL/de2
-				m0 = nodal_mesh[ind0, 0]
-				dm0 = nodal_mesh[ind0, 4]
-				m1 = nodal_mesh[ind1, 0]
-				dm1 = nodal_mesh[ind1, 4]
-				# Convert nodal points to cartesian
-				n0x, n0y, n0z = mathhelper.prolate2cart(nodal_mesh[ind0, 0], nodal_mesh[ind0, 1], nodal_mesh[ind0, 2], self.focus)
-				# Plot arc
-				for k in range(2, len(e)):
-					# Determine point to use
-					if k == 2:
-						pt_x, pt_y, pt_z = n0x, n0y, n0z
-					else:
-						pt_x, pt_y, pt_z = x_here, y_here, z_here
-					# Get lambda
-					hm0 = 1 - 3*(e[k]**2) + 2*(e[k]**3)
-					hdm0 = e[k]*(e[k] - 1)**2
-					hm1 = (e[k]**2)*(3 - 2*e[k])
-					hdm1 = (e[k]**2)*(e[k] - 1)
-					m = hm0 * m0 + hdm0 * dm0 + hm1 * m1 + hdm1 * dm1
-					# Get nu
-					n_here = n0 + e[k]*(n1-n0)
-					# Convert to cartesian
-					x_here, y_here, z_here = mathhelper.prolate2cart(m, n_here, nodal_phi[i], self.focus)
-					# Append the vectors for plotting
-					x = np.append(pt_x, x_here)
-					y = np.append(pt_y, y_here)
-					z = np.append(pt_z, z_here)
-					# Plot the segment
-					ax.plot(z, y, -x, 'k-.')
-					
-		return(ax)
 	
 	def feMeshRender(self):
 		"""Interpolate element density mesh based on endo and epi surfaces.
@@ -790,72 +615,6 @@ class Mesh():
 		
 		return(final_node_inds)
 	
-	def displayScarTrace(self, scar, ax=None):
-		"""Plots scar trace overlay onto a passed axis.
-		"""
-		if not ax:
-			fig = mplt.figure()
-			ax = fig.add_subplot(111, projection='3d')
-		for scar_slice in scar:
-			# Append the first point to the end to make a circular contour
-			cur_scar = np.append(scar_slice, np.expand_dims(scar_slice[0, :], 0), axis=0)
-			# Transform the data using the same transformation as endo/epi contours
-			data_scar = np.dot((cur_scar - np.array([self.origin for i in range(cur_scar.shape[0])])), np.transpose(self.transform))
-			# Plot
-			x = data_scar[:, 2]
-			y = data_scar[:, 1]
-			z = data_scar[:, 0]
-			ax.plot(x, y, -z, 'r-')
-		return(ax)
-	
-	def displayDensePts(self, dense_pts, dense_slices, dense_displacement_all=False, dense_plot_quiver=0, timepoint=-1, ax=None):
-		"""Shows DENSE pointts and (optionally) displacements in a 3D graph.
-		"""
-		# If no axes were passed, generate axes
-		if not ax:
-			fig = mplt.figure()
-			ax = fig.add_subplot(111, projection='3d')
-		
-		# Pull appropriate timepoint (or set to False if displacement is undesired)
-		if timepoint >= 0:
-			try:
-				dense_displacement = dense_displacement_all[timepoint]
-			except(IndexError):
-				warnings.warn('Timepoint not in range of values! Displacement will be ignored.')
-				timepoint = -1
-				dense_displacement = False
-			except(TypeError):
-				warnings.warn('Displacement not passed, but timepoint requested! Displacement will be ignored.')
-				dense_displacement = False
-		else:
-			dense_displacement = False
-		
-		for i in range(len(dense_slices)):
-			cur_slice = dense_slices[i]
-			cur_dense_pts = np.column_stack((dense_pts[i], [cur_slice - self.origin[2]]*dense_pts[i].shape[0]))
-			data_dense = np.dot(cur_dense_pts, np.transpose(self.transform))
-			x = data_dense[:, 2]
-			y = data_dense[:, 1]
-			z = data_dense[:, 0]
-			ax.scatter(x, y, -z, ',')
-			
-			if dense_displacement:
-				dense_displacement_slice = dense_displacement[i]
-				if dense_plot_quiver == 1:
-					ax.quiver(x, y, -z, dense_displacement_slice[:, 0], dense_displacement_slice[:, 1], [0]*dense_displacement_slice.shape[0])
-		return(ax)
-	
-	def nodeRender(self, nodes, ax=None):
-		"""Display the nodes passed in as a 3D scatter plot."""
-		if not ax:
-			fig = mplt.figure()
-			ax = fig.add_subplot(111, projection='3d')
-		x = nodes[:, 2]
-		y = nodes[:, 1]
-		z = nodes[:, 0]
-		ax.scatter(x, y, -z)
-		return(ax)
-	
 	def _fitBicubicData(self, data, focus, mesh_density='4x2', smooth=True, constraints=True, compute_errors=True):
 		"""Bicubic fit of x,y,z data to a prolate mesh
 		
@@ -943,7 +702,7 @@ class Mesh():
 				pts_elem[element_number - 1] = pts_elem[element_number - 1] + 1
 				# Build dof vector.
 				# 	ind is the index vector, of length 16.
-				ind = self.__generateInd(size_nodal_nu, corner13phi, corner24phi, corner12nu, corner34nu, m)
+				ind = meshhelper.generateInd(size_nodal_nu, corner13phi, corner24phi, corner12nu, corner34nu, m)
 
 				dof_model = np.array(init_guess)[ind]
 				
@@ -990,7 +749,7 @@ class Mesh():
 				mu, nu, phi = mathhelper.cart2prolate(data_x[i], data_y[i], data_z[i], focus)
 				if nu >= min_nodal_nu and nu < max_nodal_nu:
 					e, corner13phi, corner24phi, corner12nu, corner34nu = meshhelper.nearestNodalPoints(nu, phi, nodal_phi, size_nodal_phi, max_nodal_phi, nodal_nu, min_nodal_nu, max_nodal_nu)
-					ind = self.__generateInd(size_nodal_nu, corner13phi, corner24phi, corner12nu, corner34nu, m)
+					ind = meshhelper.generateInd(size_nodal_nu, corner13phi, corner24phi, corner12nu, corner34nu, m)
 					dof_model = optimized_dof[ind]
 					
 					lam_model, _ = self._generalFit(dof_model, e)
@@ -1029,64 +788,7 @@ class Mesh():
 		# Construct the full y array by stacking the columns
 		y = np.column_stack((first_coord, second_coord, third_coord, coord1_der1, coord1_der2, coord1_der3))
 		return(y)
-		
-	def _prepData(self, all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts):
-		"""Reorganize endo and epi data for processing.
-		
-		args:
-			all_data_endo (array): Endo data from MRI model
-			all_data_epi (array): Epi data from MRI model
-			apex_pt (array): Apical point selected from long-axis data
-			basal_pt (array): Basal point selected from long-axis data
-			septal_pts (array): Septal points selected from short-axis data
-		returns:
-			data_endo (array): Modified endo contour
-			data_epi (array): Modified epi contour
-			focus (float): The focal point for prolate coordinates
-			transform_basis (array): Combined vector from the 3 calculated basis vectors
-			origin (array): Point indicating the origin point
-		"""
-		endo = all_data_endo[:, 0:3]
-		epi = all_data_epi[:, 0:3]
-		
-		# Calculate first basis vector, (Base - Apex)/Magnitude
-		c = apex_pt - basal_pt
-		c_norm = self._calcNorm(c)
-		e1_basis = [c1 / c_norm for c1 in c]
-		
-		# Calculate Origin Location
-		origin = basal_pt + c/3
-		
-		# Calculate Focus Length based on c_norm
-		focus = (2*c_norm/3)/(math.cosh(1))
-		num_points = endo.shape[0]
-		
-		# Calculate Second basis vector using plane intersects, septal point, and e1
-		d1 = septal_pts[0, :] - origin
-		d2 = d1 - [np.dot(d1, e1_basis)*e1_elem for e1_elem in e1_basis]
-		e2_basis = d2 / self._calcNorm(d2)
-		
-		# Calculate third basis vector from the first 2 basis vectors
-		e3 = np.cross(e1_basis, e2_basis)
-		e3_basis = e3 / self._calcNorm(e3)
-		
-		# Set up transform basis from the 3 calculated basis vectors
-		transform_basis = np.array([e1_basis, e2_basis, -e3_basis])
-		
-		# Set up the modified endo and epi contours
-		data_endo = np.dot((endo - np.array([origin for i in range(num_points)])), np.transpose(transform_basis))
-		data_epi = np.dot((epi - np.array([origin for i in range(num_points)])), np.transpose(transform_basis))
-		
-		# Append extra identifying data to the modified contours
-		data_endo = np.append(data_endo, np.reshape(all_data_endo[:, 3], [all_data_endo.shape[0], 1]), axis=1)
-		data_epi = np.append(data_epi, np.reshape(all_data_epi[:, 3], [all_data_epi.shape[0], 1]), axis=1)
-		return([data_endo, data_epi, focus, transform_basis, origin])
-		
-	def _calcNorm(self, arr_in):
-		"""Calculate the norm of an input array"""
-		norm = np.sqrt(np.sum(np.square(arr_in)))
-		return norm
-		
+	
 	def _generalFit(self, dof_model, e, order=0):
 		"""Compute lambda values by bicubic Hermite-Lagrange basis functions.
 		
@@ -1232,7 +934,7 @@ class Mesh():
 				corner12mu = mu+1
 				corner34mu = corner12mu + 1
 				# Generate the index array of relevant degrees of freedom
-				ind = self.__generateInd(size_nodal_mu, corner13theta, corner24theta, corner12mu, corner34mu, num_nodes)
+				ind = meshhelper.generateInd(size_nodal_mu, corner13theta, corner24theta, corner12mu, corner34mu, num_nodes)
 				# Step through each Gauss point
 				for e1 in range(num_gp[0]):
 					for e2 in range(num_gp[1]):
@@ -1373,38 +1075,6 @@ class Mesh():
 				
 				h[2, :] = h_temp
 		return(h)
-		
-	def __generateInd(self, size_nodal_mu, corner13theta, corner24theta, corner12mu, corner34mu, num_nodes):
-		"""Generates the ind list based on nearest nodal points and the size of the nodal mu array
-		
-		args:
-			size_nodal_mu (int): Size of nodal mu array
-			corner13theta - corner34mu (ints): Indices of nearest nodal points
-			num_nodes (int): Total number of nodes
-		returns:
-			ind (list): List of indices for nearest nodal points
-		"""
-		ind = []
-		# Append nearest nodal points
-		ind.append(size_nodal_mu*(corner13theta - 1) + corner12mu - 1)
-		ind.append(size_nodal_mu*(corner24theta - 1) + corner12mu - 1)
-		ind.append(size_nodal_mu*(corner13theta - 1) + corner34mu - 1)
-		ind.append(size_nodal_mu*(corner24theta - 1) + corner34mu - 1)
-		ind.append(ind[0] + num_nodes)
-		ind.append(ind[1] + num_nodes)
-		ind.append(ind[2] + num_nodes)
-		ind.append(ind[3] + num_nodes)
-		ind.append(ind[4] + num_nodes)
-		ind.append(ind[5] + num_nodes)
-		ind.append(ind[6] + num_nodes)
-		ind.append(ind[7] + num_nodes)
-		ind.append(ind[8] + num_nodes)
-		ind.append(ind[9] + num_nodes)
-		ind.append(ind[10] + num_nodes)
-		ind.append(ind[11] + num_nodes)
-		# Convert list from floats to ints
-		ind = [int(ind_i) for ind_i in ind]
-		return(ind)
 		
 	def _solveReducedSystem(self, lhs_matrix, global_rhs, c, num_dof_total, nn, num_dof_mesh, num_time_nodes=1):
 		"""Use the constraints encoded in c to reduce linear system of equations and solve
@@ -1565,62 +1235,7 @@ class Mesh():
 			d3 = d2 + num_nodes
 			dof_data.append([dof[lam_ind], dof[d1], dof[d2], dof[d3]])
 		return(np.array(dof_data))
-	'''	
-	def __calcCornerThetaMu(self, z2, z3, nodal_theta, size_nodal_theta, max_nodal_theta, nodal_mu, min_nodal_mu, max_nodal_mu):
-		"""Find the 4 nearest nodal points
-		Uses a convention from Hashima et al
-		
-		args:
-			z2 (float): mu
-			z3 (float): theta
-			nodal_theta (array): Theta values for each node
-			size_nodal_theta (int): Size of the nodal theta array
-			max_nodal_theta (float): Maximum value in nodal theta
-			nodal_mu (array): Mu values for each node
-			min_nodal_mu (float): Minimum value in nodal mu
-			max_nodal_mu (float): Maximum value in nodal mu
-		"""
-		e = [0, 0]
-		# Special theta cases
-		if z3 >= 2*math.pi: # If theta is above 2pi
-			z3 -= 2*math.pi
-			t13 = nodal_theta[1]
-			t24 = nodal_theta[0]
-			e[0] = (t13 - z3)/(t13 - t24)
-			# Indices for theta
-			corner13theta = 2
-			corner24theta = 1
-		elif z3 >= max_nodal_theta: # If theta = 0 is e[0] = 0
-			t13 = 2*math.pi
-			t24 = max_nodal_theta
-			e[0] = (t13 - z3)/(t13 - t24)
-			# Indices for theta
-			corner13theta = 1
-			corner24theta = size_nodal_theta
-		else: # General theta case
-			min_t = np.where(nodal_theta <= z3)[0].size
-			t13 = nodal_theta[min_t]
-			t24 = nodal_theta[min_t-1]
-			e[0] = (t13 - z3) / (t13 - t24)
-			# Indices for theta
-			corner13theta = min_t + 1
-			corner24theta = min_t
-		# Special mu cases
-		if z2 == min_nodal_mu: # Smallest mu value possible
-			corner12mu = 1
-			corner34mu = 2
-		elif z2 == max_nodal_mu: # Largest mu value possible
-			corner12mu = size_nodal_mu - 1
-			corner34mu = size_nodal_mu
-		else: # General mu case
-			min_m = np.where(nodal_mu < z2)[0].size
-			m12 = nodal_mu[min_m - 1]
-			m34 = nodal_mu[min_m]
-			e[1] = (z2 - m12)/(m34 - m12)
-			corner12mu = min_m
-			corner34mu = min_m + 1
-		return([e, corner13theta, corner24theta, corner12mu, corner34mu])
-	'''	
+
 	def _biCubicInterp(self, x_data, y_data, node_data, scale_der=0):
 		"""Interpolate the x and y data to a bicubic fit
 		
