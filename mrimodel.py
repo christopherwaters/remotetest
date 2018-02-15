@@ -75,7 +75,7 @@ class MRIModel():
 			self.dense = False
 		
 		# Define variables used in all models
-		self.apex_base_pts = self._importLongAxis(self.long_axis_file)
+		self.apex_base_pts = importhelper.importLongAxis(self.long_axis_file)
 		
 		self.cine_endo = []
 		self.cine_epi = []
@@ -110,7 +110,7 @@ class MRIModel():
 			boolean: True if import was successful.
 		"""
 		# Import the Black-Blood cine (short axis) stack
-		endo_stack, epi_stack, rv_insertion_pts, sastruct, septal_slice = self._importStack(self.cine_file, timepoint)
+		endo_stack, epi_stack, rv_insertion_pts, sastruct, septal_slice = importhelper.importStack(self.cine_file, timepoint)
 		kept_slices = sastruct['KeptSlices']
 		
 		# Get the adjusted contours from the stacks
@@ -175,7 +175,7 @@ class MRIModel():
 		Returns:
 			boolean: True if the import was successful.
 		"""
-		scar_endo_stack, scar_epi_stack, scar_insertion_pts, scarstruct, scar_septal_slice = self._importStack(self.scar_file)
+		scar_endo_stack, scar_epi_stack, scar_insertion_pts, scarstruct, scar_septal_slice = importhelper.importStack(self.scar_file)
 		
 		# Prepare variables imported from file.
 		scar_auto = np.array(scarstruct['Scar']['Auto'])
@@ -188,7 +188,7 @@ class MRIModel():
 		scar_combined = np.swapaxes(np.swapaxes(scar_combined, 1, 2), 0, 1)
 		
 		# Get the x-y values from the mask
-		scar_abs, scar_endo, scar_epi, scar_ratio, scar_slices = self._getMaskContour(scar_endo_stack, scar_epi_stack, scar_insertion_pts, scarstruct, scar_septal_slice, scar_combined)
+		scar_abs, scar_endo, scar_epi, scar_ratio, scar_slices = stackhelper.getMaskContour(scar_endo_stack, scar_epi_stack, scar_insertion_pts, scarstruct, scar_septal_slice, scar_combined, self.apex_base_pts)
 		
 		# Store instance fields
 		self.lge_apex_pt = scar_abs[0]
@@ -275,273 +275,8 @@ class MRIModel():
 		
 		return(True)
 	
-	def _importStack(self, short_axis_file, timepoint=0):
-		"""Imports the short-axis file and formats data from it.
-		
-		Data is imported using the custom loadmat function
-		to open the struct components appropriately. All short-axis
-		data is imported during this function.
-		
-		args:
-			short_axis_file: File for the short-axis data and segmentation.
-		
-		returns:
-			array cxyz_sa_endo: Endocardial contour stack
-			array cxyz_sa_epi: Epicardial contour stack
-			rv_insertion_pts: The endocardial pinpoints indicating location where RV epicardium intersects LV epicardium
-			setstruct: The MATLAB structure contained within the short-axis file (part of SEGMENT's output)
-			septal_slice: The slices containing the RV insertion pinpoints
-		"""
-		
-		# Import and format the short axis stack and pull relevant variables from the structure.
-		short_axis_data = importhelper.loadmat(short_axis_file)
-		setstruct = short_axis_data['setstruct']
-		endo_x = np.array(setstruct['EndoX'])
-		endo_y = np.array(setstruct['EndoY'])
-		epi_x = np.array(setstruct['EpiX'])
-		epi_y = np.array(setstruct['EpiY'])
-		# Data can be varying dimensions, so this ensures that arrays are reshaped
-		#    into the same dimensionality and adjusts axis order for improved human readability
-		if endo_x.ndim >= 3:
-			endo_x = np.swapaxes(endo_x, 0, 1)
-			endo_x = np.swapaxes(endo_x, 2, 1)
-			endo_y = np.swapaxes(endo_y, 0, 1)
-			endo_y = np.swapaxes(endo_y, 2, 1)
-			epi_x = np.swapaxes(epi_x, 0, 1)
-			epi_x = np.swapaxes(epi_x, 2, 1)
-			epi_y = np.swapaxes(epi_y, 0, 1)
-			epi_y = np.swapaxes(epi_y, 2, 1)
-		else:
-			endo_x = endo_x.transpose()
-			endo_y = endo_y.transpose()
-			epi_x = epi_x.transpose()
-			epi_y = epi_y.transpose()
-			shape = endo_x.shape
-			endo_x = endo_x.reshape(1, shape[0], shape[1])
-			endo_y = endo_y.reshape(1, shape[0], shape[1])
-			epi_x = epi_x.reshape(1, shape[0], shape[1])
-			epi_y = epi_y.reshape(1, shape[0], shape[1])
-
-		# Process the setstruct to get time points and slices that were segmented
-		kept_slices, time_id = stackhelper.removeEmptySlices(setstruct, endo_x)
-		kept_slices = np.array(kept_slices)
-		time_id = np.squeeze(np.array(time_id))
-		endo_pin_x = np.array(setstruct['EndoPinX'])
-		endo_pin_y = np.array(setstruct['EndoPinY'])
-		
-		# If more than 1 timepoint is passed, use the indicated timepoint at call
-		if time_id.size > 1:
-			try:
-				time_id = np.where(endo_pin_x)[0][timepoint]
-			except(IndexError):
-				print('Invalid timepoint selected. Adjusting to initial timepoint.')
-				time_id = np.where(endo_pin_x)[0][0]
-		
-		# Ensure that the pinpoint arrays are the correct dimensionality    
-		if endo_pin_x.ndim == 1:
-			endo_pin_x = endo_pin_x.reshape(1, endo_pin_x.shape[0])
-		if endo_pin_y.ndim == 1:
-			endo_pin_y = endo_pin_y.reshape(1, endo_pin_y.shape[0])
-			
-		# Finds the slice where the pinpoints are placed and treats it as the septal slice    
-		septal_slice = self._findRVSlice(endo_pin_x)
-		
-		# Extract the x and y pinpoints for the current contour
-		x_pins = np.array(endo_pin_x[time_id, septal_slice][0][0])
-		y_pins = np.array(endo_pin_y[time_id, septal_slice][0][0])
-		endo_pins = np.array([x_pins, y_pins]).transpose()
-		
-		# Calculate the Septal Mid-Point from the pinpoints
-		sept_pt = mathhelper.findMidPt(endo_pins, time_id, septal_slice, endo_x, endo_y)
-
-		# Add the midpoint to the x and y pinpoint list and add it back to setstruct
-		#        This part requires somewhat complex list comprehensions to reduce clutter and due to the complexity of the data format
-		new_endo_pin_x = [np.append(cur_endo_pin_x, sept_pt[0]).tolist() if cur_endo_pin_x else cur_endo_pin_x for cur_endo_pin_x in endo_pin_x .flatten()]
-		new_endo_pin_y = [np.append(cur_endo_pin_y, sept_pt[1]).tolist() if cur_endo_pin_y else cur_endo_pin_y for cur_endo_pin_y in endo_pin_y.flatten()]
-		endo_pin_x = np.reshape(new_endo_pin_x, endo_pin_x.shape)
-		endo_pin_y = np.reshape(new_endo_pin_y, endo_pin_y.shape)
-		
-		# Store relevant variables in the setstruct dictionary for use downstream
-		setstruct['EndoPinX'] = endo_pin_x
-		setstruct['EndoPinY'] = endo_pin_y
-		setstruct['KeptSlices'] = kept_slices
-		setstruct['endo_x'] = endo_x
-		setstruct['endo_y'] = endo_y
-		setstruct['epi_x'] = epi_x
-		setstruct['epi_y'] = epi_y
-		
-		# Rotate the endo and epi contours (and pinpoints with the endo contour)
-		cxyz_sa_endo, rv_insertion_pts, _, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='endo')
-		cxyz_sa_epi, _, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='epi')
-
-		return([cxyz_sa_endo, cxyz_sa_epi, rv_insertion_pts, setstruct, septal_slice])
-	
-	def _getMaskContour(self, mask_endo_stack, mask_epi_stack, mask_insertion_pts, mask_struct, mask_septal_slice, mask, transmural_filter=0.1, interp_vals=True, elim_secondary=True):
-		"""Generic import for binary mask overlays onto a contour stack.
-		
-		The mask input should be a binary mask overlay aligned with the struct variable.
-		The data is returned in the form of a ratio of wall thickness at angle bins.
-		
-		args:
-			mask_endo_stack (array): The endo stack variable from the mask stack import
-			mask_epi_stack (array): The epi stack variable from the mask stack import
-			mask_insertion_pts (array): The insertion points from the mask stack import
-			mask_struct (dict): The 'struct' variable returned from stack import
-			mask_septal_slice (int): The septal slice returned from stack import
-			mask (array): The binary mask that determines the location of the regions of interest
-			transmural_filter (float): A variable that indicates the minimal transmurality to keep
-			interp_vals (bool): Determine whether or not single-bin gaps should be interpolated
-			elim_secondary (bool): Determine whether or not non-contiguous, smaller regions should be removed
-			
-		returns:
-			mask_abs (array): The apex-base-septal points array from stack rotation and transformation
-			mask_endo (array): The endocardial contour of the mask structure
-			mask_epi (array): The epicardial contour of the mask structure
-			mask_ratio (array): The inner and outer contours as a ratio of wall thickness, binned using polar angles to differentiate segments
-			mask_slices (list): The list of slices that contained regions of interest for the mask
-		"""
-		# Get the mask XY values
-		cxyz_mask, kept_slices, mask_slices = stackhelper.getMaskXY(mask, mask_struct)
-		
-		# Convert the stacks
-		mask_abs, mask_endo, mask_epi, axis_center, all_mask = stackhelper.getContourFromStack(mask_endo_stack, mask_epi_stack, mask_struct, mask_insertion_pts, mask_septal_slice, self.apex_base_pts, cxyz_mask)
-		
-		# Get polar values and wall thickness
-		mask_endo_polar, mask_epi_polar, mask_polar = stackhelper.convertSlicesToPolar(kept_slices, mask_endo, mask_epi, all_mask, scar_flag=True)
-		wall_thickness = np.append(np.expand_dims(mask_endo_polar[:, :, 1], axis=2), np.expand_dims(mask_epi_polar[:, :, 3] - mask_endo_polar[:, :, 3], axis=2), axis=2)
-		
-		# Calculate ratio through wall based on angle binning
-		inner_distance = mask_polar[:, :, 3] - mask_endo_polar[:, :, 3]
-		outer_distance = mask_polar[:, :, 4] - mask_endo_polar[:, :, 3]
-		inner_ratio = np.expand_dims(inner_distance/wall_thickness[:, :, 1], axis=2)
-		outer_ratio = np.expand_dims(outer_distance/wall_thickness[:, :, 1], axis=2)
-		mask_ratio = np.append(np.expand_dims(wall_thickness[:, :, 0], axis=2), np.append(inner_ratio, outer_ratio, axis=2), axis=2)
-		
-		# If desired, eliminate regions outside of transmurality lower limit
-		if transmural_filter:
-			mask_ratio[np.isnan(mask_ratio)] = 0
-			low_trans = np.where(mask_ratio[:, :, 2] - mask_ratio[:, :, 1] < transmural_filter)
-			mask_ratio[low_trans[0], low_trans[1], 1:] = np.nan
-		
-		# Interpolate single-bin gaps, if desired (for contiguous traces)
-		if interp_vals:
-			for i in range(mask_ratio.shape[0]):
-				mask_slice = mask_ratio[i, :, :]
-				mask_slice_nans = np.where(np.isnan(mask_slice[:, 1]))[0]
-				mask_slice_nan_iso = [(((mask_slice_nans_i + 1) % mask_slice.shape[0]) not in mask_slice_nans) & (((mask_slice_nans_i - 1) % mask_slice.shape[0]) not in mask_slice_nans) for mask_slice_nans_i in mask_slice_nans]
-				mask_slice_nan_ind = mask_slice_nans[mask_slice_nan_iso]
-				for mask_ind in mask_slice_nan_ind:
-					mask_inner_adj = [mask_slice[(mask_ind - 1) % mask_slice.shape[0], 1], mask_slice[(mask_ind + 1) % mask_slice.shape[0], 1]]
-					mask_outer_adj = [mask_slice[(mask_ind - 1) % mask_slice.shape[0], 2], mask_slice[(mask_ind + 1) % mask_slice.shape[0], 2]]
-					mask_inner_mean = np.mean(mask_inner_adj)
-					mask_outer_mean = np.mean(mask_outer_adj)
-					mask_slice[mask_ind, 1] = mask_inner_mean
-					mask_slice[mask_ind, 2] = mask_outer_mean
-			mask_ratio[i, :, :] = mask_slice
-			
-		# Eliminate small, non-contiguous regions, if desired (for a single trace)
-		if elim_secondary:
-			for i in range(mask_ratio.shape[0]):
-				mask_slice = mask_ratio[i, :, :]
-					# If there is no scar on this slice, go to next slice
-				if np.all(np.isnan(mask_slice[:, 1])):
-					continue
-				# Pull the scar indices where there is no nan value
-				mask_slice_nonan = np.where(~np.isnan(mask_slice[:, 1]))[0]
-				# Calculate the differences between each value in the index array, and append the difference between the last and first points
-				gap_dist = np.diff(mask_slice_nonan)
-				gap_dist = np.append(gap_dist, mask_slice_nonan[0] + mask_slice.shape[0] - mask_slice_nonan[-1])
-				# If there is only 1 gap, then there is only one scar contour, so continue to next slice
-				if np.count_nonzero(gap_dist > 1) == 1:
-					gap_dist[gap_dist > 1] = 1
-				if np.all(gap_dist == 1):
-					continue
-				# The case where there are multiple non-contiguous scar traces:
-				for j in range(math.floor(np.count_nonzero(gap_dist > 1)/2)):
-					# Get the indices around the non-contiguous regions
-					ind1 = (np.where(gap_dist > 1)[0][0] + 1) % (len(gap_dist))
-					ind2 = (np.where(gap_dist > 1)[0][1] + 1) % (len(gap_dist))
-					if ind1 > ind2:
-						lower_index = ind2
-						upper_index = ind1
-					else:
-						lower_index = ind1
-						upper_index = ind2
-					# Split the list, then set the longer list (main scar trace) as the value (essentially remove the smaller scar trace)
-					slice_u2l = mask_slice_nonan[:lower_index].tolist() + mask_slice_nonan[upper_index:].tolist()
-					slice_l2u = mask_slice_nonan[lower_index:upper_index].tolist()
-					if len(slice_u2l) > len(slice_l2u):
-						mask_slice_nonan = np.array(slice_u2l)
-					else:
-						mask_slice_nonan = np.array(slice_l2u)
-					# Recalculate gap distance
-					gap_dist = np.diff(mask_slice_nonan)
-					if mask_slice_nonan[-1] == mask_slice.shape[0] - 1 and mask_slice_nonan[0] == 0:
-						gap_dist = np.append(gap_dist, 1)
-					if np.count_nonzero(gap_dist > 1) == 1:
-						gap_dist[gap_dist > 1] = 1
-				# Set up temporary arrays to pull the main slice
-				new_mask_inner = np.empty(mask_slice.shape[0])
-				new_mask_inner[:] = np.NAN
-				new_mask_outer = new_mask_inner.copy()
-				new_mask_inner[mask_slice_nonan] = mask_slice[mask_slice_nonan, 1]
-				new_mask_outer[mask_slice_nonan] = mask_slice[mask_slice_nonan, 2]
-				# Reassign the scar contour, overwriting non-contiguous traces with NaN
-				mask_slice[:, 1] = new_mask_inner
-				mask_slice[:, 2] = new_mask_outer
-				mask_ratio[i, :, :] = mask_slice
-		
-		# Translate Endo and Epicardial contours back to cartesian
-		mask_endo_cart, mask_epi_cart = stackhelper.shiftPolarCartesian(mask_endo_polar, mask_epi_polar, mask_endo, mask_epi, mask_slices, axis_center, wall_thickness)
-		avg_wall_thickness = np.mean(wall_thickness[:, :, 1])
-		
-		return([mask_abs, mask_endo, mask_epi, mask_ratio, mask_slices])
-	
-	def _findRVSlice(self, pin_x):
-		"""Find the slice where the pinpoints have been placed"""
-		# Sum the pinpoint locations to find the nonzero slice where the pinpoints have been placed
-		septal_slice = np.where([np.sum(pin_x[:, cur_slice][0]) for cur_slice in range(pin_x.shape[1])])
-		return(septal_slice)
-	
-	def _importLongAxis(self, long_axis_file):
-		"""Imports data from a long-axis file with pinpoints for apex and basal locations
-		
-		args:
-			long_axis_file (string): MAT file from SEGMENT with long-axis data
-		returns:
-			apex_base_pts (array): The points indicating the apex and basal points indicated in the file
-		"""
-		# Load the file using custom loadmat function
-		long_axis_data = importhelper.loadmat(long_axis_file)
-		# Pull the setstruct data from the global structure
-		lastruct = long_axis_data['setstruct']
-		# Get the apex and basal points from stack transformation
-		apex_base_pts, pinpts = stackhelper.transformStack(lastruct, layer='long')
-		return(apex_base_pts)
-	
-	def _plotStacks(self, abs_shifted, ab_list, endo_shifted, epi_shifted, scar_shifted=[], scar=False):
-		"""Plot all pinpoints, endocardial contour, epicardial contour, and (if passed) scar points"""
-		# Pull and convert values
-		ab_x, ab_y, ab_z = ab_list
-		endo_shift_arr = np.array(endo_shifted)
-		epi_shift_arr = np.array(epi_shifted)
-		# Established matplotlib3d figure and axes
-		fig = mplt.figure()
-		ax = fig.add_subplot(111, projection='3d')
-		# Use scatter to plot the apex, base, and septal points
-		ax.scatter(abs_shifted[:, 0], abs_shifted[:, 1], abs_shifted[:, 2])
-		# Plot the line between the apex and base points
-		ax.plot(ab_x, ab_y, ab_z, c='c')
-		# Use the scatter to plot the endo and epi contours
-		ax.scatter(endo_shift_arr[:, 0], endo_shift_arr[:, 1], endo_shift_arr[:, 2], c='r')
-		ax.scatter(epi_shift_arr[:, 0], epi_shift_arr[:, 1], epi_shift_arr[:, 2], c='g')
-		if scar:
-			# Plot all of the scar points passed
-			scar_shift_arr = np.array(scar_shifted)
-			ax.scatter(scar_shift_arr[:, 0], scar_shift_arr[:, 1], scar_shift_arr[:, 2], c='k')
-	
 	def alignScarCine(self, timepoint=0):
-		"""One of the attempts to align the scar and cine meshes.
+		"""A method of aligning scar and cine data
 		"""
 		# If a timepoint is passed, pull the cine from that point
 		cine_endo = self.cine_endo[timepoint]
@@ -680,31 +415,7 @@ class MRIModel():
 			self.aligned_scar = [None] * len(self.cine_endo)
 		self.aligned_scar[timepoint] = full_scar_contour
 		return(full_scar_contour)
-	'''	
-	def __getTimeIndices(self, contour, time_pts, timepoint=0):
-		"""Generate indices of the contour that match with the indicated time point.
-		
-		args:
-			contour: The endo or epi contour from getEndoEpiFromStack
-			time_pts: The list of all timepoints. The fourth column from endo/epi_stack
-			timepoint: The timepoint of interest (passed an an index)
-		returns:
-			all_slice_inds (list): A list of lists, indicating indices per slice that fall in the desired timepoint.
-		"""
-		# Get all indices that match the time point
-		time_selected = np.where(time_pts == timepoint)[0]
-		# Get the possible range of indices for each slice
-		#	Initial stack is a single list, contour is split by slice, so must correct for that
-		contour_slice_inds = [0] + [contour_i.shape[0] for contour_i in contour]
-		contour_slice_range = np.cumsum(contour_slice_inds)
-		# Set up list to store slice index lists
-		all_slice_inds = [None] * len(contour)
-		# Iterate through contour and pull per-slice timepoints
-		for i in range(len(contour)):
-			cur_slice_timepts = [time_selected_i - contour_slice_range[i] for time_selected_i in time_selected if contour_slice_range[i] <= time_selected_i < contour_slice_range[i+1]]
-			all_slice_inds[i] = cur_slice_timepts
-		return(all_slice_inds)
-	'''	
+
 	def alignDense(self, cine_timepoint=0):
 		"""Align DENSE data to a cine slice by selected timepoint.
 		"""

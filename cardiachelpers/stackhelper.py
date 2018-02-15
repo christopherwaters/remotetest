@@ -393,6 +393,127 @@ def rotateStack(setstruct, slice_labels, layer='endo', axial_flag=False):
 		returnList = [cxyz, Pd, m_arr, heartrate]
 	return(returnList)
 
+def getMaskContour(mask_endo_stack, mask_epi_stack, mask_insertion_pts, mask_struct, mask_septal_slice, mask, apex_base_pts, transmural_filter=0.1, interp_vals=True, elim_secondary=True):
+	"""Generic import for binary mask overlays onto a contour stack.
+	
+	The mask input should be a binary mask overlay aligned with the struct variable.
+	The data is returned in the form of a ratio of wall thickness at angle bins.
+	
+	args:
+		mask_endo_stack (array): The endo stack variable from the mask stack import
+		mask_epi_stack (array): The epi stack variable from the mask stack import
+		mask_insertion_pts (array): The insertion points from the mask stack import
+		mask_struct (dict): The 'struct' variable returned from stack import
+		mask_septal_slice (int): The septal slice returned from stack import
+		mask (array): The binary mask that determines the location of the regions of interest
+		transmural_filter (float): A variable that indicates the minimal transmurality to keep
+		interp_vals (bool): Determine whether or not single-bin gaps should be interpolated
+		elim_secondary (bool): Determine whether or not non-contiguous, smaller regions should be removed
+		
+	returns:
+		mask_abs (array): The apex-base-septal points array from stack rotation and transformation
+		mask_endo (array): The endocardial contour of the mask structure
+		mask_epi (array): The epicardial contour of the mask structure
+		mask_ratio (array): The inner and outer contours as a ratio of wall thickness, binned using polar angles to differentiate segments
+		mask_slices (list): The list of slices that contained regions of interest for the mask
+	"""
+	# Get the mask XY values
+	cxyz_mask, kept_slices, mask_slices = getMaskXY(mask, mask_struct)
+	
+	# Convert the stacks
+	mask_abs, mask_endo, mask_epi, axis_center, all_mask = getContourFromStack(mask_endo_stack, mask_epi_stack, mask_struct, mask_insertion_pts, mask_septal_slice, apex_base_pts, cxyz_mask)
+	
+	# Get polar values and wall thickness
+	mask_endo_polar, mask_epi_polar, mask_polar = convertSlicesToPolar(kept_slices, mask_endo, mask_epi, all_mask, scar_flag=True)
+	wall_thickness = np.append(np.expand_dims(mask_endo_polar[:, :, 1], axis=2), np.expand_dims(mask_epi_polar[:, :, 3] - mask_endo_polar[:, :, 3], axis=2), axis=2)
+	
+	# Calculate ratio through wall based on angle binning
+	inner_distance = mask_polar[:, :, 3] - mask_endo_polar[:, :, 3]
+	outer_distance = mask_polar[:, :, 4] - mask_endo_polar[:, :, 3]
+	inner_ratio = np.expand_dims(inner_distance/wall_thickness[:, :, 1], axis=2)
+	outer_ratio = np.expand_dims(outer_distance/wall_thickness[:, :, 1], axis=2)
+	mask_ratio = np.append(np.expand_dims(wall_thickness[:, :, 0], axis=2), np.append(inner_ratio, outer_ratio, axis=2), axis=2)
+	
+	# If desired, eliminate regions outside of transmurality lower limit
+	if transmural_filter:
+		mask_ratio[np.isnan(mask_ratio)] = 0
+		low_trans = np.where(mask_ratio[:, :, 2] - mask_ratio[:, :, 1] < transmural_filter)
+		mask_ratio[low_trans[0], low_trans[1], 1:] = np.nan
+	
+	# Interpolate single-bin gaps, if desired (for contiguous traces)
+	if interp_vals:
+		for i in range(mask_ratio.shape[0]):
+			mask_slice = mask_ratio[i, :, :]
+			mask_slice_nans = np.where(np.isnan(mask_slice[:, 1]))[0]
+			mask_slice_nan_iso = [(((mask_slice_nans_i + 1) % mask_slice.shape[0]) not in mask_slice_nans) & (((mask_slice_nans_i - 1) % mask_slice.shape[0]) not in mask_slice_nans) for mask_slice_nans_i in mask_slice_nans]
+			mask_slice_nan_ind = mask_slice_nans[mask_slice_nan_iso]
+			for mask_ind in mask_slice_nan_ind:
+				mask_inner_adj = [mask_slice[(mask_ind - 1) % mask_slice.shape[0], 1], mask_slice[(mask_ind + 1) % mask_slice.shape[0], 1]]
+				mask_outer_adj = [mask_slice[(mask_ind - 1) % mask_slice.shape[0], 2], mask_slice[(mask_ind + 1) % mask_slice.shape[0], 2]]
+				mask_inner_mean = np.mean(mask_inner_adj)
+				mask_outer_mean = np.mean(mask_outer_adj)
+				mask_slice[mask_ind, 1] = mask_inner_mean
+				mask_slice[mask_ind, 2] = mask_outer_mean
+		mask_ratio[i, :, :] = mask_slice
+		
+	# Eliminate small, non-contiguous regions, if desired (for a single trace)
+	if elim_secondary:
+		for i in range(mask_ratio.shape[0]):
+			mask_slice = mask_ratio[i, :, :]
+				# If there is no scar on this slice, go to next slice
+			if np.all(np.isnan(mask_slice[:, 1])):
+				continue
+			# Pull the scar indices where there is no nan value
+			mask_slice_nonan = np.where(~np.isnan(mask_slice[:, 1]))[0]
+			# Calculate the differences between each value in the index array, and append the difference between the last and first points
+			gap_dist = np.diff(mask_slice_nonan)
+			gap_dist = np.append(gap_dist, mask_slice_nonan[0] + mask_slice.shape[0] - mask_slice_nonan[-1])
+			# If there is only 1 gap, then there is only one scar contour, so continue to next slice
+			if np.count_nonzero(gap_dist > 1) == 1:
+				gap_dist[gap_dist > 1] = 1
+			if np.all(gap_dist == 1):
+				continue
+			# The case where there are multiple non-contiguous scar traces:
+			for j in range(math.floor(np.count_nonzero(gap_dist > 1)/2)):
+				# Get the indices around the non-contiguous regions
+				ind1 = (np.where(gap_dist > 1)[0][0] + 1) % (len(gap_dist))
+				ind2 = (np.where(gap_dist > 1)[0][1] + 1) % (len(gap_dist))
+				if ind1 > ind2:
+					lower_index = ind2
+					upper_index = ind1
+				else:
+					lower_index = ind1
+					upper_index = ind2
+				# Split the list, then set the longer list (main scar trace) as the value (essentially remove the smaller scar trace)
+				slice_u2l = mask_slice_nonan[:lower_index].tolist() + mask_slice_nonan[upper_index:].tolist()
+				slice_l2u = mask_slice_nonan[lower_index:upper_index].tolist()
+				if len(slice_u2l) > len(slice_l2u):
+					mask_slice_nonan = np.array(slice_u2l)
+				else:
+					mask_slice_nonan = np.array(slice_l2u)
+				# Recalculate gap distance
+				gap_dist = np.diff(mask_slice_nonan)
+				if mask_slice_nonan[-1] == mask_slice.shape[0] - 1 and mask_slice_nonan[0] == 0:
+					gap_dist = np.append(gap_dist, 1)
+				if np.count_nonzero(gap_dist > 1) == 1:
+					gap_dist[gap_dist > 1] = 1
+			# Set up temporary arrays to pull the main slice
+			new_mask_inner = np.empty(mask_slice.shape[0])
+			new_mask_inner[:] = np.NAN
+			new_mask_outer = new_mask_inner.copy()
+			new_mask_inner[mask_slice_nonan] = mask_slice[mask_slice_nonan, 1]
+			new_mask_outer[mask_slice_nonan] = mask_slice[mask_slice_nonan, 2]
+			# Reassign the scar contour, overwriting non-contiguous traces with NaN
+			mask_slice[:, 1] = new_mask_inner
+			mask_slice[:, 2] = new_mask_outer
+			mask_ratio[i, :, :] = mask_slice
+	
+	# Translate Endo and Epicardial contours back to cartesian
+	mask_endo_cart, mask_epi_cart = shiftPolarCartesian(mask_endo_polar, mask_epi_polar, mask_endo, mask_epi, mask_slices, axis_center, wall_thickness)
+	avg_wall_thickness = np.mean(wall_thickness[:, :, 1])
+	
+	return([mask_abs, mask_endo, mask_epi, mask_ratio, mask_slices])
+	
 def getMaskXY(mask, maskstruct):
 	"""General form to get binary masks (such as scar data) as xy overlays.
 	"""

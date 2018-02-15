@@ -18,6 +18,9 @@ import matplotlib.path as path
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.patches import Polygon
 import subprocess
+from cardiachelpers import stackhelper
+from cardiachelpers import mathhelper
+from cardiachelpers import meshhelper
 
 class Mesh():
 
@@ -178,7 +181,7 @@ class Mesh():
 		nodal_phi = nodal_mesh[::size_nodal_nu, 2]
 		# Convert apex node from prolate to cartesian, then plot with scatter
 		if min(nodal_nu) == 0:
-			x, y, z = self._prolateToCart(nodal_mesh[0, 0], nodal_mesh[0, 1], nodal_mesh[0, 2], self.focus)
+			x, y, z = mathhelper.prolate2cart(nodal_mesh[0, 0], nodal_mesh[0, 1], nodal_mesh[0, 2], self.focus)
 			ax.scatter(z, y, -x)
 			start_nu = 1
 		else:
@@ -201,7 +204,7 @@ class Mesh():
 				m1 = nodal_mesh[ind1, 0]
 				dm1 = nodal_mesh[ind1, 3]
 				# Convert to cartesian
-				n0x, n0y, n0z = self._prolateToCart(nodal_mesh[ind0, 0], nodal_mesh[ind0, 1], nodal_mesh[ind0, 2], self.focus)
+				n0x, n0y, n0z = mathhelper.prolate2cart(nodal_mesh[ind0, 0], nodal_mesh[ind0, 1], nodal_mesh[ind0, 2], self.focus)
 				# Plot the node
 				ax.scatter(n0z, n0y, -n0x)
 				# Plot the arc segments
@@ -220,7 +223,7 @@ class Mesh():
 					# Get theta
 					p_here = p0 - e[k]*(p0 - p1)
 					# Convert to cartesian
-					x_here, y_here, z_here = self._prolateToCart(m, nodal_nu[i], p_here, self.focus)
+					x_here, y_here, z_here = mathhelper.prolate2cart(m, nodal_nu[i], p_here, self.focus)
 					# Create vectors
 					x = np.append(pt_x, x_here)
 					y = np.append(pt_y, y_here)
@@ -241,7 +244,7 @@ class Mesh():
 				m1 = nodal_mesh[ind1, 0]
 				dm1 = nodal_mesh[ind1, 4]
 				# Convert nodal points to cartesian
-				n0x, n0y, n0z = self._prolateToCart(nodal_mesh[ind0, 0], nodal_mesh[ind0, 1], nodal_mesh[ind0, 2], self.focus)
+				n0x, n0y, n0z = mathhelper.prolate2cart(nodal_mesh[ind0, 0], nodal_mesh[ind0, 1], nodal_mesh[ind0, 2], self.focus)
 				# Plot arc
 				for k in range(2, len(e)):
 					# Determine point to use
@@ -258,7 +261,7 @@ class Mesh():
 					# Get nu
 					n_here = n0 + e[k]*(n1-n0)
 					# Convert to cartesian
-					x_here, y_here, z_here = self._prolateToCart(m, n_here, nodal_phi[i], self.focus)
+					x_here, y_here, z_here = mathhelper.prolate2cart(m, n_here, nodal_phi[i], self.focus)
 					# Append the vectors for plotting
 					x = np.append(pt_x, x_here)
 					y = np.append(pt_y, y_here)
@@ -335,12 +338,12 @@ class Mesh():
 		endo_nu = endo_interp_surf[:, :, 1]
 		endo_phi = endo_interp_surf[:, :, 2]
 		
-		endo_x, endo_y, endo_z = self._prolateToCart(endo_mu, endo_nu, endo_phi, self.focus)
+		endo_x, endo_y, endo_z = mathhelper.prolate2cart(endo_mu, endo_nu, endo_phi, self.focus)
 		
 		epi_mu = epi_interp_surf[:, :, 0]
 		epi_nu = epi_interp_surf[:, :, 1]
 		epi_phi = epi_interp_surf[:, :, 2]
-		epi_x, epi_y, epi_z = self._prolateToCart(epi_mu, epi_nu, epi_phi, self.focus)
+		epi_x, epi_y, epi_z = mathhelper.prolate2cart(epi_mu, epi_nu, epi_phi, self.focus)
 		
 		# Interpolate nodes between endo and epi
 		step_x = np.reshape((epi_x - endo_x)/self.elem_in_wall, [epi_x.shape[0], epi_x.shape[1], 1])
@@ -366,7 +369,7 @@ class Mesh():
 		z = np.tile(endo_z, (1, 1, self.elem_in_wall + 1)) + np.tile(step_z, (1, 1, self.elem_in_wall+1))*steps
 		
 		# Convert cartesian back to prolate
-		m, n, p = self._cartToProlate(x, y, z, self.focus)
+		m, n, p = mathhelper.cart2prolate(x, y, z, self.focus)
 		
 		# Rotate each matrix by 90 degrees
 		x = np.rot90(x)
@@ -547,9 +550,9 @@ class Mesh():
 				# Combine new points
 				scar_pts = np.column_stack((x_new_z, y_new_z))	
 			# Convert the values to polar to compare radial and circumferential extent
-			new_z_theta, new_z_rho = self._cartToPol(scar_pts[:, 0], scar_pts[:, 1])
-			elem_center_theta, elem_center_rho = self._cartToPol(elem_center[2], elem_center[1])
-			theta_min, theta_max, direction = self.__getAngleRange(new_z_theta)
+			new_z_theta, new_z_rho = mathhelper.cartToPol(scar_pts[:, 0], scar_pts[:, 1])
+			elem_center_theta, elem_center_rho = mathhelper.cartToPol(elem_center[2], elem_center[1])
+			theta_min, theta_max, direction = mathhelper.getAngleRange(new_z_theta)
 			# If the scar is min->max in normal order, direction is True
 			# 	Delete elements outside of the circumferential extent, then move to the next element
 			if direction:
@@ -623,7 +626,7 @@ class Mesh():
 		dense_pts_z = [[dense_slices[i] - self.origin[2]]*dense_pts[i].shape[0] for i in range(len(dense_slices))]
 		
 		# Convert nodes to prolate, calculate centers, and return to cartesian
-		nodes_prol_mu, nodes_prol_nu, nodes_prol_phi = self._cartToProlate(self.nodes[:, 0], self.nodes[:, 1], self.nodes[:, 2])
+		nodes_prol_mu, nodes_prol_nu, nodes_prol_phi = mathhelper.cart2prolate(self.nodes[:, 0], self.nodes[:, 1], self.nodes[:, 2], self.focus)
 		
 		elem_con = self.pent if conn_mat == 'pent' else self.hex
 		
@@ -635,7 +638,7 @@ class Mesh():
 			elem_prol = np.column_stack((nodes_prol_mu[nodes_in_elem], nodes_prol_nu[nodes_in_elem], nodes_prol_phi[nodes_in_elem]))
 			elem_center_prol = np.mean(elem_prol, axis=0)
 			elem_prol_centers[i] = [elem_center_prol[0], elem_center_prol[1], elem_center_prol[2]]
-			elem_center_cart = self._prolateToCart(elem_center_prol[0], elem_center_prol[1], elem_center_prol[2])
+			elem_center_cart = mathhelper.prolate2cart(elem_center_prol[0], elem_center_prol[1], elem_center_prol[2], self.focus)
 			elem_cart_centers[i] = elem_center_cart
 		
 		dense_pts_prol = np.array([])
@@ -644,7 +647,7 @@ class Mesh():
 		for slice_num in range(len(dense_slices)):
 			cur_slice_pts = np.column_stack((dense_pts[slice_num], dense_pts_z[slice_num]))
 			cur_slice_pts = np.dot(cur_slice_pts, np.transpose(self.transform))
-			csd_mu, csd_nu, csd_phi = self._cartToProlate(cur_slice_pts[:, 0], cur_slice_pts[:, 1], cur_slice_pts[:, 2])
+			csd_mu, csd_nu, csd_phi = mathhelper.cart2prolate(cur_slice_pts[:, 0], cur_slice_pts[:, 1], cur_slice_pts[:, 2], self.focus)
 			if dense_pts_prol.size:
 				dense_pts_cart = np.append(dense_pts_cart, cur_slice_pts, axis=0)
 				dense_pts_prol = np.append(dense_pts_prol, np.column_stack((csd_mu, csd_nu, csd_phi)), axis=0)
@@ -747,11 +750,11 @@ class Mesh():
 		err_val = 0
 		
 		# Convert nodes to cartesian for measurement
-		nodes_prol_mu, nodes_prol_nu, nodes_prol_phi = self._cartToProlate(self.nodes[:, 0], self.nodes[:, 1], self.nodes[:, 2])
+		nodes_prol_mu, nodes_prol_nu, nodes_prol_phi = mathhelper.cart2prolate(self.nodes[:, 0], self.nodes[:, 1], self.nodes[:, 2], self.focus)
 		nodes_prol = np.column_stack((nodes_prol_mu, nodes_prol_nu, nodes_prol_phi))
 		
 		# Convert region to prolate
-		region_mu, region_nu, region_phi = self._cartToProlate(region_contour[:, 0], region_contour[:, 1], region_contour[:, 2])
+		region_mu, region_nu, region_phi = mathhelper.cart2prolate(region_contour[:, 0], region_contour[:, 1], region_contour[:, 2], self.focus)
 		region_prol = np.column_stack((region_mu, region_nu, region_phi))
 		region_prol_edges = region_prol[0::contour_edge_spacing, :]
 		
@@ -932,10 +935,10 @@ class Mesh():
 		max_nodal_phi = max(nodal_phi)
 		for i in range(count):
 			ind = []
-			mu, nu, phi = self._cartToProlate(data_x[i], data_y[i], data_z[i], focus)
+			mu, nu, phi = mathhelper.cart2prolate(data_x[i], data_y[i], data_z[i], focus)
 			if nu >= min_nodal_nu and nu <= max_nodal_nu:
 				data_size += 1
-				e, corner13phi, corner24phi, corner12nu, corner34nu = self.__calcCornerThetaMu(nu, phi, nodal_phi, size_nodal_phi, max_nodal_phi, nodal_nu, min_nodal_nu, max_nodal_nu)
+				e, corner13phi, corner24phi, corner12nu, corner34nu = meshhelper.nearestNodalPoints(nu, phi, nodal_phi, size_nodal_phi, max_nodal_phi, nodal_nu, min_nodal_nu, max_nodal_nu)
 				element_number = int((corner12nu-1)*size_nodal_phi + corner24phi)
 				pts_elem[element_number - 1] = pts_elem[element_number - 1] + 1
 				# Build dof vector.
@@ -984,9 +987,9 @@ class Mesh():
 			
 			# Iterate through points again to estimate error
 			for i in range(count):
-				mu, nu, phi = self._cartToProlate(data_x[i], data_y[i], data_z[i], focus)
+				mu, nu, phi = mathhelper.cart2prolate(data_x[i], data_y[i], data_z[i], focus)
 				if nu >= min_nodal_nu and nu < max_nodal_nu:
-					e, corner13phi, corner24phi, corner12nu, corner34nu = self.__calcCornerThetaMu(nu, phi, nodal_phi, size_nodal_phi, max_nodal_phi, nodal_nu, min_nodal_nu, max_nodal_nu)
+					e, corner13phi, corner24phi, corner12nu, corner34nu = meshhelper.nearestNodalPoints(nu, phi, nodal_phi, size_nodal_phi, max_nodal_phi, nodal_nu, min_nodal_nu, max_nodal_nu)
 					ind = self.__generateInd(size_nodal_nu, corner13phi, corner24phi, corner12nu, corner34nu, m)
 					dof_model = optimized_dof[ind]
 					
@@ -1083,78 +1086,6 @@ class Mesh():
 		"""Calculate the norm of an input array"""
 		norm = np.sqrt(np.sum(np.square(arr_in)))
 		return norm
-		
-	def _cartToProlate(self, x, y, z, focus=None):
-		"""Convert passed x, y, z from cartesian to prolate based on focus."""
-		# Check if focus is passed
-		if focus is None: focus = self.focus
-		# Checks if the data is a matrix to set the loop.
-		matrix_flag = False
-		if isinstance(x, np.ndarray):
-			# Store the shape of the passed array, then flatten them
-			input_shape = x.shape
-			x = np.reshape(x, x.size, 1)
-			y = np.reshape(y, y.size, 1)
-			z = np.reshape(z, z.size, 1)
-			len_x = x.size
-			matrix_flag = True
-		else:
-			len_x = 1
-		m = np.zeros((len_x, 1))
-		n = np.zeros((len_x, 1))
-		p = np.zeros((len_x, 1))
-		# Loop through the vaues and perform equations to convert to prolate.
-		for jz in range(len_x):
-			# Pull values from array if arrays were passed
-			if matrix_flag:
-				x1 = x[jz]
-				x2 = y[jz]
-				x3 = z[jz]
-			else:
-				x1 = x
-				x2 = y
-				x3 = z
-			a1 = x1**2 + x2**2 + x3**2 - focus**2
-			a2 = math.sqrt((a1**2)+4*(focus**2)*((x2**2)+(x3**2)))
-			a3 = 2*(focus**2)
-			a4 = max([(a1+a2)/a3, 0])
-			a5 = max([(a2-a1)/a3, 0])
-			a6 = math.sqrt(a4)
-			a7 = min([math.sqrt(a5), 1])
-			a8 = math.asin(a7) if abs(a7) <= 1 else 0
-			if abs(a7) > 1: print('SLH_CMI_C2P: A8 is zero')
-			if x3==0 or a6==0 or a7==0:
-				a9 = 0
-			else:
-				a9 = x3 / (focus*a6*a7) if abs(a6*a7)>0 else 0
-			a9 = math.pi/2 if a9 >= 1 else -math.pi/2 if a9 <= -1 else math.asin(a9)
-			# Set the prolate values lambda (z1), mu (z2), and theta (z3)
-			z1 = math.log(a6 + math.sqrt(a4+1))
-			z2 = a8 if x1 >= 0 else math.pi - a8
-			z3 = math.fmod(a9, 2*math.pi) if x2 >= 0 else math.pi-a9
-			# Store the singular values into the array
-			if matrix_flag:
-				m[jz] = z1
-				n[jz] = z2
-				p[jz] = z3
-			else:
-				m = z1
-				n = z2
-				p = z3
-		# Reshape the mu, nu, and phi arrays based on the input arrays
-		if matrix_flag:
-			m = np.reshape(m, input_shape, order='F')
-			n = np.reshape(n, input_shape, order='F')
-			p = np.reshape(p, input_shape, order='F')
-		return([m, n, p])
-		
-	def _prolateToCart(self, m, n, p, focus=None):
-		"""Convert passed lambda, mu, theta from prolate to cartesian based on focus."""
-		if focus is None: focus = self.focus
-		x = focus * np.cosh(m) * np.cos(n)
-		y = focus * np.sinh(m) * np.sin(n) * np.cos(p)
-		z = focus * np.sinh(m) * np.sin(n) * np.sin(p)
-		return([x, y, z])
 		
 	def _generalFit(self, dof_model, e, order=0):
 		"""Compute lambda values by bicubic Hermite-Lagrange basis functions.
@@ -1634,7 +1565,7 @@ class Mesh():
 			d3 = d2 + num_nodes
 			dof_data.append([dof[lam_ind], dof[d1], dof[d2], dof[d3]])
 		return(np.array(dof_data))
-		
+	'''	
 	def __calcCornerThetaMu(self, z2, z3, nodal_theta, size_nodal_theta, max_nodal_theta, nodal_mu, min_nodal_mu, max_nodal_mu):
 		"""Find the 4 nearest nodal points
 		Uses a convention from Hashima et al
@@ -1689,7 +1620,7 @@ class Mesh():
 			corner12mu = min_m
 			corner34mu = min_m + 1
 		return([e, corner13theta, corner24theta, corner12mu, corner34mu])
-		
+	'''	
 	def _biCubicInterp(self, x_data, y_data, node_data, scale_der=0):
 		"""Interpolate the x and y data to a bicubic fit
 		
@@ -1767,7 +1698,7 @@ class Mesh():
 						corner[:, 4] *= (corner[3, 1]-corner[1, 1])*rads
 						corner[:, 5] *= (math.pi/180)*(corner[0, 2]-corner[1, 2])*(corner[3, 1]-corner[1, 1])*rads
 					# Set a array points equal to lambda
-					a[i, j, 2:n] = self._getLambda(corner, e)
+					a[i, j, 2:n] = meshhelper.getLambda(corner, e)
 					
 					if scale_der > 0:
 						# Modify the a array values based on corner values
@@ -1779,90 +1710,3 @@ class Mesh():
 		a[:, :, 0] = a[:, :, 2]
 		a[:, :, 2] = temp
 		return(a)
-					
-	def _getLambda(self, c, e):
-		"""Compute Lambda Values and Derivatives by Cubic Hermite Function"""
-		
-		l = []
-		
-		h00 = [1 - 3*(e_i**2) + 2*(e_i**3) for e_i in e]
-		h10 = [e_i*((e_i-1)**2) for e_i in e]
-		h01 = [(e_i**2)*(3-2*e_i) for e_i in e]
-		h11 = [(e_i**2)*(e_i-1) for e_i in e]
-		
-		dh00 = [6*((e_i**2)-e_i) for e_i in e]
-		dh10 = [3*(e_i**2)-4*e_i+1 for e_i in e]
-		dh01 = [6*(e_i-e_i**2) for e_i in e]
-		dh11 = [3*(e_i**2)-2*e_i for e_i in e]
-		
-		l1 = h00[0]*h00[1]*c[0,0] + h01[0]*h00[1]*c[1,0] + h00[0]*h01[1]*c[2,0] + h01[0]*h01[1]*c[3,0]
-		l2 = h10[0]*h00[1]*c[0,3] + h11[0]*h00[1]*c[1,3] + h10[0]*h01[1]*c[2,3] + h11[0]*h01[1]*c[3,3]
-		l3 = h00[0]*h10[1]*c[0,4] + h01[0]*h10[1]*c[1,4] + h00[0]*h11[1]*c[2,4] + h01[0]*h11[1]*c[3,4]
-		l4 = h10[0]*h10[1]*c[0,5] + h11[0]*h10[1]*c[1,5] + h10[0]*h11[1]*c[2,5] + h11[0]*h11[1]*c[3,5]
-		l = np.append(l, l1 + l2 + l3 + l4)
-		
-		dl1wrt1 = dh00[0]*h00[1]*c[0,0] + dh01[0]*h00[1]*c[1,0] + dh00[0]*h01[1]*c[2,0] + dh01[0]*h01[1]*c[3,0]
-		dl2wrt1 = dh10[0]*h00[1]*c[0,3] + dh11[0]*h00[1]*c[1,3] + dh10[0]*h01[1]*c[2,3] + dh11[0]*h01[1]*c[3,3]
-		dl3wrt1 = dh00[0]*h10[1]*c[0,4] + dh01[0]*h10[1]*c[1,4] + dh00[0]*h11[1]*c[2,4] + dh01[0]*h11[1]*c[3,4]
-		dl4wrt1 = dh10[0]*h10[1]*c[0,5] + dh11[0]*h10[1]*c[1,5] + dh10[0]*h11[1]*c[2,5] + dh11[0]*h11[1]*c[3,5]
-		l = np.append(l, dl1wrt1 + dl2wrt1 + dl3wrt1 + dl4wrt1)
-		
-		dl1wrt2 = h00[0]*dh00[1]*c[0,0] + h01[0]*dh00[1]*c[1,0] + h00[0]*dh01[1]*c[2,0] + h01[0]*dh01[1]*c[3,0]
-		dl2wrt2 = h10[0]*dh00[1]*c[0,3] + h11[0]*dh00[1]*c[1,3] + h10[0]*dh01[1]*c[2,3] + h11[0]*dh01[1]*c[3,3]
-		dl3wrt2 = h00[0]*dh10[1]*c[0,4] + h01[0]*dh10[1]*c[1,4] + h00[0]*dh11[1]*c[2,4] + h01[0]*dh11[1]*c[3,4]
-		dl4wrt2 = h10[0]*dh10[1]*c[0,5] + h11[0]*dh10[1]*c[1,5] + h10[0]*dh11[1]*c[2,5] + h11[0]*dh11[1]*c[3,5]
-		l = np.append(l, dl1wrt2 + dl2wrt2 + dl3wrt2 + dl4wrt2)
-		
-		dl1wrt12 = dh00[0]*dh00[1]*c[0,0] + dh01[0]*dh00[1]*c[1,0] + dh00[0]*dh01[1]*c[2,0] + dh01[0]*dh01[1]*c[3,0]
-		dl2wrt12 = dh10[0]*dh00[1]*c[0,3] + dh11[0]*dh00[1]*c[1,3] + dh10[0]*dh01[1]*c[2,3] + dh11[0]*dh01[1]*c[3,3]
-		dl3wrt12 = dh00[0]*dh10[1]*c[0,4] + dh01[0]*dh10[1]*c[1,4] + dh00[0]*dh11[1]*c[2,4] + dh01[0]*dh11[1]*c[3,4]
-		dl4wrt12 = dh10[0]*dh10[1]*c[0,5] + dh11[0]*dh10[1]*c[1,5] + dh10[0]*dh11[1]*c[2,5] + dh11[0]*dh11[1]*c[3,5]
-		l = np.append(l, dl1wrt12 + dl2wrt12 + dl3wrt12 + dl4wrt12)
-
-		return(l)
-		
-	def __getAngleRange(self, angles):
-		"""Get the leftmost and rightmost values from a passed series of angles.
-		
-		The angles should be circular, with a total possible range of 2*pi. The purpose of this function
-		is to allow finding the circular extent of angles that cross the origin point.
-		
-		args:
-			angles (float arr-like): The angles for which ranges are being determined.
-		returns:
-			angle_min (float): The "minimum" angle (clockwise)
-			angle_max (float): The "maximum" angle (clockwise)
-			direction (bool): True if the scar does not pass through the origin (angle flip point)
-		"""
-		# Get maximum and minimum angle values and subtract
-		angle_max = np.max(angles)
-		angle_min = np.min(angles)
-		init_range = angle_max - angle_min
-		# If the range is less than 2*pi, you don't cross the origin
-		if init_range < 6:
-			direction = True
-			return([angle_min, angle_max, direction])
-		else:
-			# Sort angles from minimum -> maximum, append initial value to the end, increased by 2*pi
-			angles_sorted = np.sort(angles)
-			angles_sorted = np.append(angles_sorted, angles_sorted[0] + 2*math.pi)
-			# Calculate the moving differential
-			angles_diff = [angles_sorted[i+1] - angles_sorted[i] for i in range(len(angles))]
-			# The "true minimum" (most counterclockwise angle) is immediately after the largest gap
-			angle_min = angles_sorted[np.argmax(angles_diff, axis=0) + 1]
-			angle_max = angles_sorted[np.argmax(angles_diff, axis=0)]
-			# Determine directionality to ensure that scar values are between the minimum and maximum appropriately
-			direction = np.all(np.bitwise_and(angles >= angle_min, angles <= angle_max))
-		return([angle_min, angle_max, direction])
-		
-	def _cartToPol(self, x, y):
-		"""Convert cartesian (x, y) coordinates to polar (theta, rho) coordinates"""
-		rho = np.sqrt(np.square(x) + np.square(y))
-		theta = np.arctan2(y,x)
-		theta = np.where(theta < 0, theta + 2*np.pi, theta)
-		return np.array([theta, rho])
-		
-	def _polToCart(self, theta, rho):
-		"""Convert polar (theta, rho) coordinates to cartesian (x, y) coordinates"""
-		x = rho*np.cos(theta)
-		y = rho*np.sin(theta)
