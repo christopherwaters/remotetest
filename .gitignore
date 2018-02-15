@@ -9,3 +9,8 @@ ehthumbs.db
 # Python directories #
 __pycache__/
 Test*Data/
+cardiachelper/__pycache__
+
+# Files just in namespace from old work #
+helper.py
+importhelper.py
