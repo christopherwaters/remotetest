@@ -299,12 +299,11 @@ class modelGUI(tk.Frame):
 		if confocal_dir == '':
 			messagebox.showinfo('No Directory', 'Please select a directory for confocal images.')
 			return(False)
-		try:
-			self.confocal_model = confocalmodel.ConfocalModel(confocal_dir)
-			self.confocal_model.stitchImages()
-		except:
-			messagebox.showinfo('Failed', 'Confocal model creation failed. Check inputs and try again.')
-			return(False)
+		#try:
+		self.confocal_model = confocalmodel.ConfocalModel(confocal_dir)
+		#except:
+		#	messagebox.showinfo('Failed', 'Confocal model creation failed. Check inputs and try again.')
+		#	return(False)
 	
 	def cineTimeChanged(self):
 		"""Function to respond to timepoint adjustments in the base cine mesh / model

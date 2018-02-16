@@ -17,7 +17,7 @@ import matplotlib.pyplot as mplt
 import glob
 from PIL import Image
 import os
-from cardiachelper import importhelper
+from cardiachelpers import importhelper
 
 class ConfocalModel():
 	"""Model class to hold confocal microscopy images and format them to generate a mesh to align with MRI data.
@@ -25,6 +25,9 @@ class ConfocalModel():
 
 	def __init__(self, confocal_dir):
 		"""Initialize the model made to import confocal microscopy data.
+		
+		args:
+			confocal_dir (string): The path to the directory containing tif image files
 		"""
 		
 		# Get all TIFF files in the directory
@@ -37,8 +40,27 @@ class ConfocalModel():
 			self.raw_images[file_num] = Image.open(self.tif_files[file_num])
 		
 		# Import each file as an image itself
-		self.channels = []
-			
+		self.compressImages()
+		self.raw_images[0].show()
+		self.compressed_images[0].show()
+	
+	def compressImages(self, image_scale=0.5):
+		"""Resize the raw images in the model, to allow easier manipulation and display.
+		
+		Resets the compressed_images field on-call, to allow only one set of compressed images per instance.
+		
+		args:
+			image_scale (float): Determines the ratio of new image size to old image size
+		"""
+		self.compressed_images = [None]*len(self.raw_images)
+		new_size = [int(image_scale*dimension) for dimension in self.raw_images[0].size]
+		if any(self.raw_images):
+			for image_num in range(len(self.raw_images)):
+				self.compressed_images[image_num] = self.raw_images[image_num].resize(new_size, Image.LANCZOS)
+			return(True)
+		else:
+			return(False)
+	
 	def splitImageChannels(self, images=None):
 		"""Split images by channels indicated in args.
 		"""
