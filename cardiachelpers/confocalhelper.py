@@ -2,27 +2,33 @@ import scipy.ndimage
 import numpy as np
 from PIL import Image
 
-def splitChannels(images_in):
+def splitChannels(images_in, pull_channel=-1):
 	"""Splits an image (or multiple images) to its different channels, then returns a nested list of the channels.
 	"""
 	if isinstance(images_in, list):
-		split_images = None
-		for image in images_in:
-			num_bands = len(image.getbands())
-			image_bands = [None]*num_bands
-			for band in range(num_bands):
-				image_bands[band] = image.getdata(band)
-			if len(split_images):
-				split_images.append(image_bands)
+		split_images = [None]*len(images_in)
+		for i in range(len(images_in)):
+			im = images_in[i]
+			image_arr = np.array(im)
+			num_channels = len(im.getbands())
+			if pull_channel >= 0 and pull_channel < num_channels:
+				split_images[i] = Image.fromarray(image_arr[:, :, pull_channel])
 			else:
-				split_images = [image_bands]
+				split_by_band = [None]*num_channels
+				for chan_ind in range(num_channels):
+					split_by_band[chan_ind] = Image.fromarray(image_arr[:, :, chan_ind])
+				split_images[i] = split_by_band
 		return(split_images)
 	else:
-		num_bands = len(images_in.getbands())
-		image_bands = [None]*num_bands
-		for band in range(num_bands):
-			image_bands[band] = images_in.getdata(band)
-		return(image_bands)
+		image_arr = np.array(images_in)
+		num_channels = len(images_in.getbands())
+		if pull_channel >= 0 and pull_channel < num_channels:
+			split_by_band = Image.fromarray(image_arr[:, :, pull_channel])
+		else:
+			split_by_band = [None]*num_channels
+			for chan_ind in range(num_channels):
+				split_by_band[chan_ind] = Image.fromarray(image_arr[:, :, chan_ind])
+		return(split_by_band)
 		
 def splitImageFrames(image_in):
 	"""Splits an image (or multiple images as a list) to its different frames, and returns a list containing the images.
