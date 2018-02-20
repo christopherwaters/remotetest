@@ -5,6 +5,8 @@ Contains information necessary for import and alignment of confocal microscopy i
 Created on Mon Jan 27 12:22:15 2018
 
 @author: cdw2be
+
+Planar Image Brightness Correction based on: https://imagej.nih.gov/ij/plugins/plane-brightness/2010_Michalek_Biosignal.pdf
 """
 
 # Imports
