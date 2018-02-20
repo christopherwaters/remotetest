@@ -1,6 +1,7 @@
 import scipy.ndimage
 import numpy as np
 from PIL import Image
+from cardiachelpers import importhelper
 
 def splitChannels(images_in, pull_channel=-1):
 	"""Splits an image (or multiple images) to its different channels, then returns a nested list of the channels.
@@ -48,6 +49,43 @@ def splitImageFrames(image_in):
 			split_image[i] = image_in.copy()
 		return(split_image)
 
-def chamferDist(image_in):
-	dist_out = scipy.ndimage.morphology.distance_transform_cdt(image_in)
-	return(dist_out)
+def stitchImages(images_in, image_grid):
+	pass
+
+def getImagePositions(image_files):
+	"""Small function to pull image position data from Volocity-exported TIF files.
+	"""
+	# Set which data is desired
+	data_categories = ['XLocationMicrons', 'YLocationMicrons', 'XCalibrationMicrons', 'YCalibrationMicrons']
+	
+	# Create array to store all categorical data for each image
+	image_positions = np.empty((len(image_files), len(data_categories)))
+	for file_num, tif_file in enumerate(image_files):
+		with open(tif_file, encoding='utf8', errors='ignore') as temp_file:
+			file_lines = temp_file.readlines()
+			for line in file_lines:
+				# Line split by '=' represents a property (if length = 2)
+				line_split = line.split('=')
+				if len(line_split) == 2:
+					# If the category is in the list of desired categories, store it by appropriate column
+					if line_split[0] in data_categories:
+						image_positions[file_num, data_categories.index(line_split[0])] = float(line_split[1])
+		
+	# Create a dict object to represent which data is in each column
+	column_dict = {data_categories[i] : i for i in range(len(data_categories))}
+	return([image_positions, column_dict])
+
+def getImageGrid(image_files, image_locs, locs_dict):
+	x_col = locs_dict['XLocationMicrons']
+	y_col = locs_dict['YLocationMicrons']
+	
+	locs_x = image_locs[:, x_col]
+	locs_y = image_locs[:, y_col]
+	
+	x_slots = np.unique(np.round(locs_x))
+	y_slots = np.unique(np.round(locs_y))
+	
+	img_x_inds = [np.where(np.round(locs_x[i]) == x_slots)[0] for i in range(locs_x.shape[0])]
+	img_y_inds = [np.where(np.round(locs_y[i]) == y_slots)[0] for i in range(locs_y.shape[0])]
+	
+	return(np.column_stack((img_x_inds, img_y_inds)))

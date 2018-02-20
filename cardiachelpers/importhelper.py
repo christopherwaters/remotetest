@@ -198,26 +198,3 @@ def importStack(short_axis_file, timepoint=0):
 	cxyz_sa_epi, _, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='epi')
 
 	return([cxyz_sa_endo, cxyz_sa_epi, rv_insertion_pts, setstruct, septal_slice])
-	
-def getImagePositions(image_files):
-	"""Small function to pull image position data from Volocity-exported TIF files.
-	"""
-	# Set which data is desired
-	data_categories = ['XLocationMicrons', 'YLocationMicrons', 'XCalibrationMicrons', 'YCalibrationMicrons']
-	
-	# Create array to store all categorical data for each image
-	image_positions = np.empty((len(image_files), len(data_categories)))
-	for file_num, tif_file in enumerate(image_files):
-		with open(tif_file, encoding='utf8', errors='ignore') as temp_file:
-			file_lines = temp_file.readlines()
-			for line in file_lines:
-				# Line split by '=' represents a property (if length = 2)
-				line_split = line.split('=')
-				if len(line_split) == 2:
-					# If the category is in the list of desired categories, store it by appropriate column
-					if line_split[0] in data_categories:
-						image_positions[file_num, data_categories.index(line_split[0])] = float(line_split[1])
-		
-	# Create a dict object to represent which data is in each column
-	column_dict = {data_categories[i] : i for i in range(len(data_categories))}
-	return([image_positions, column_dict])
