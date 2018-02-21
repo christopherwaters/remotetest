@@ -49,8 +49,30 @@ def splitImageFrames(image_in):
 			split_image[i] = image_in.copy() if image_in.mode == 'RGB' else image_in.copy().convert(mode='RGB')
 		return(split_image)
 
-def stitchImages(images_in, image_inds):
-	pass
+def stitchImages(images_in, image_x_inds, image_y_inds, save_pos):
+	"""Piece images together based on x and y indices to form a single large image.
+	"""
+	x_range = max(image_x_inds)
+	y_range = max(image_y_inds)
+	first_sublist = images_in[0]
+	while isinstance(first_sublist, list):
+		first_sublist = first_sublist[0]
+	if isinstance(first_sublist, Image.Image):
+		tile_size = first_sublist.size
+	else:
+		return(False)
+	stitched_image = Image.new('RGB', (int(x_range*tile_size[0]), int(y_range*tile_size[1])))
+	for image_num in range(len(images_in)):
+		x_pos = int((x_range-image_x_inds[image_num])*0.9*tile_size[0])
+		y_pos = int(image_y_inds[image_num]*0.9*tile_size[1])
+		cur_image = images_in[image_num]
+		while isinstance(cur_image, list):
+			cur_image = cur_image[0]
+		if not isinstance(cur_image, Image.Image):
+			return(False)
+		stitched_image.paste(cur_image, (x_pos, y_pos))
+	stitched_image.save(save_pos)
+	return(True)
 
 def getImagePositions(image_files):
 	"""Small function to pull image position data from Volocity-exported TIF files.
