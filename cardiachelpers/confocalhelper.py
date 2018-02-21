@@ -39,17 +39,17 @@ def splitImageFrames(image_in):
 		for image in image_in:
 			split_image = [None]*image.n_frames
 			for i in range(image.n_frames):
-				split_image[i] = image.copy()
+				split_image[i] = image.copy() if image.mode == 'RGB' else image.copy().convert(mode='RGB')
 			full_images.append(split_image)
 		return(full_images)
 	else:
 		split_image = [None]*image_in.n_frames
 		for i in range(image_in.n_frames):
 			image_in.seek(i)
-			split_image[i] = image_in.copy()
+			split_image[i] = image_in.copy() if image_in.mode == 'RGB' else image_in.copy().convert(mode='RGB')
 		return(split_image)
 
-def stitchImages(images_in, image_grid):
+def stitchImages(images_in, image_inds):
 	pass
 
 def getImagePositions(image_files):
@@ -89,3 +89,22 @@ def getImageGrid(image_files, image_locs, locs_dict):
 	img_y_inds = [np.where(np.round(locs_y[i]) == y_slots)[0] for i in range(locs_y.shape[0])]
 	
 	return(np.column_stack((img_x_inds, img_y_inds)))
+	
+def compressImages(images_in, image_scale=0.5):
+	"""Resize the raw images in the model, to allow easier manipulation and display.
+	
+	Resets the compressed_images field on-call, to allow only one set of compressed images per instance.
+	
+	args:
+		image_scale (float): Determines the ratio of new image size to old image size
+	"""
+	if isinstance(images_in, list):
+		compressed_images = [None]*len(images_in)
+		new_size = [int(image_scale*dimension) for dimension in images_in[0].size]
+		for image_num in range(len(images_in)):
+			compressed_images[image_num] = images_in[image_num].resize(new_size, Image.LANCZOS)
+		return(compressed_images)
+	else:
+		new_size = [int(image_scale*dimension) for dimension in images_in.size]
+		compressed_image = images_in.resize(new_size, Image.LANCZOS)
+		return(compressed_image)
