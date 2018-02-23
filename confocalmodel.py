@@ -34,59 +34,15 @@ class ConfocalModel():
 		"""
 		
 		# Get all TIFF files in the directory
-		self.tif_files = glob.glob(os.path.join(confocal_dir, '*.tif'))
-		self.raw_images = [None]*len(self.tif_files)
-		
-		# Open each image file using PIL
-		for file_num in range(len(self.tif_files)):
-			image_file = self.tif_files[file_num]
-			self.raw_images[file_num] = Image.open(self.tif_files[file_num])
-		
-		# Import each file as an image itself
-		self.compressImages()
-		self.raw_images[0].show()
-		self.compressed_images[0].show()
+		dirs = [(top_dir + '/' + sub_dir) for sub_dir in os.listdir(top_dir) if os.path.isdir(top_dir + '/' + sub_dir)]
+		self.slices = [ConfocalSlice(im_dir) for im_dir in dirs]
 	
-	def compressImages(self, image_scale=0.5):
-		"""Resize the raw images in the model, to allow easier manipulation and display.
-		
-		Resets the compressed_images field on-call, to allow only one set of compressed images per instance.
-		
-		args:
-			image_scale (float): Determines the ratio of new image size to old image size
-		"""
-		self.compressed_images = [None]*len(self.raw_images)
-		new_size = [int(image_scale*dimension) for dimension in self.raw_images[0].size]
-		if any(self.raw_images):
-			for image_num in range(len(self.raw_images)):
-				self.compressed_images[image_num] = self.raw_images[image_num].resize(new_size, Image.LANCZOS)
-			return(True)
-		else:
-			return(False)
-	
-	def splitImageChannels(self, images=None):
-		"""Split images by channels indicated in args.
-		"""
-		# Set images to internal images if nothing passed
-		if not images:
-			images = self.raw_images
-		
-		image_channels = [None]*len(images)
-		
-		for image_num in range(len(images)):
-			channels = images[image_num].getbands()
-			cur_channel = [None]*len(channels)
-			for channel_ind in range(len(channels)):
-				cur_channel[channel_ind] = images[image_num].getdata(channel_ind)
-			image_channels[image_num] = cur_channel
-			
-		image_channels_arr = np.array(image_channels)
-		return(image_channels_arr)
-	
-	def validateIntensity(self):
+	def generateStitchedImages(self, slices, sub_slices=[0], overlap=0.1, compress_ratio=0.25, channel=-1):
 		"""Adjust image intensity based on edge intensity of adacent images.
 		"""
-		pass
+		for slice_num in slices:
+			for sub_slice in sub_slices:
+				self.slices[slice_num].createStitchedImage(overlap=overlap, compress_ratio=compress_ratio, channel=channel, frame=sub_slice)
 		
 class ConfocalSlice():
 	"""Class to hold information for a single biological slice of tissue.
@@ -97,7 +53,7 @@ class ConfocalSlice():
 		self.confocal_dir = confocal_dir
 		self.slice_name = os.path.split(confocal_dir)[1]
 		
-		self.tif_files = glob.glob(os.path.join(confocal_dir, '*.tif'))
+		self.tif_files = glob.glob(os.path.join(confocal_dir, '*.tif')).copy()
 		self.raw_images = [None]*len(self.tif_files)
 		
 		for file_num, image_file in enumerate(self.tif_files):
@@ -119,15 +75,17 @@ class ConfocalSlice():
 		if not self.compressed_images[frame]:
 			self.compressed_images[frame] = [None]*len(self.raw_images)
 			
-		for raw_image, image_num in enumerate(self.raw_images):
-			image_frame = confocalhelper.splitImageFrames(raw_image)[frame]
+		for image_num, raw_image in enumerate(self.raw_images):
+			image_frames = confocalhelper.splitImageFrames(raw_image)
+			print(len(image_frames))
+			image_frame = image_frames[frame]
 			img_channels = confocalhelper.splitChannels(image_frame)
 			if channel >= 0:
-				img_channels = list(img_channels[channel])
+				img_channels = [img_channels[channel]]
 			if compress_ratio < 1:
 				compressed_channels = [None]*len(img_channels)
-				for channel, channel_num in enumerate(img_channels):
-					compressed_channels[channel_num] = confocalhelper.compressImages(channel, image_scale=compress_ratio)
+				for channel_num, cur_channel in enumerate(img_channels):
+					compressed_channels[channel_num] = confocalhelper.compressImages(cur_channel, image_scale=compress_ratio)
 				if len(compressed_channels) > 1:
 					compressed_image = Image.merge('RGB', compressed_channels)
 					self.compressed_images[frame][image_num] = compressed_image
@@ -135,6 +93,6 @@ class ConfocalSlice():
 					self.compressed_images[frame][image_num] = compressed_channels[0]
 		
 		if not stitched_file:
-			stitched_file = self.confocal_dir + 'stitched_slice=' + str(frame) + 'chan=' + str(channel) + '*.tif'
+			stitched_file = self.confocal_dir + '/' + self.slice_name + 'slice' + str(frame) + 'chan' + str(channel) + '.tif'
 			
-		stitched_success = confocalhelper.createStitchedImage(self.compressed_images[frame], self.im_grid[:, 0], self.im_grid[:, 1], save_pos=stitched_file)
+		stitched_success = confocalhelper.stitchImages(self.compressed_images[frame], self.im_grid[:, 0], self.im_grid[:, 1], save_pos=stitched_file)

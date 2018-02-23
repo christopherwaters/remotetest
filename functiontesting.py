@@ -1,9 +1,7 @@
-import glob
-import os
 import confocalmodel
 
 confocal_dir = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/ConfocalTestLargest'
 
-con_slice = confocalmodel.ConfocalSlice(confocal_dir)
+con_model = confocalmodel.ConfocalModel(confocal_dir)
 
-con_slice.createStitchedImage(channel=0)
+con_model.generateStitchedImages([0, 1], sub_slices=list(range(19)), channel=0)
