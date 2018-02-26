@@ -14,6 +14,7 @@ import warnings
 import mrimodel
 import confocalmodel
 import mesh
+import numpy as np
 from cardiachelpers import displayhelper
 
 class modelGUI(tk.Frame):
@@ -87,7 +88,18 @@ class modelGUI(tk.Frame):
 		self.cine_timepoint_cbox.grid(row=1, column=8)
 		#	Buttons to generate models
 		ttk.Button(text='Generate MRI Model', command= lambda: self.createMRIModel(sa_filename, la_filename, lge_filename, dense_filenames)).grid(row=2, column=7, columnspan=2)
-		ttk.Button(text='Generate Confocal Model', command= lambda: self.createConfocalModel(confocal_dir_entry)).grid(row=5, column=7, columnspan=2)
+		
+		
+		# Confocal Model Options
+		#	Place labels
+		#	Create options entries
+		self.confocal_slice_button = ttk.Menubutton(text='Select confocal slices', state='disabled')
+		self.confocal_slice_menu = tk.Menu(self.confocal_slice_button, tearoff=False)
+		self.confocal_slice_button.configure(menu=self.confocal_slice_menu)
+		self.confocal_slice_button.grid(row=4, column=7, columnspan=2)
+		#	Buttons to generate models
+		ttk.Button(text='Generate Confocal Model', command= lambda: self.createConfocalModel(confocal_dir_entry)).grid(row=3, column=7, columnspan=2)
+		ttk.Button(text='Stitch Selected Slices', command= lambda: self.stitchSlices()).grid(row=5, column=7, columnspan=2)
 		
 		# Mesh Options / Creation
 		#	Place labels
@@ -302,11 +314,12 @@ class modelGUI(tk.Frame):
 		if confocal_dir == '':
 			messagebox.showinfo('No Directory', 'Please select a directory for confocal images.')
 			return(False)
-		#try:
 		self.confocal_model = confocalmodel.ConfocalModel(confocal_dir)
-		#except:
-		#	messagebox.showinfo('Failed', 'Confocal model creation failed. Check inputs and try again.')
-		#	return(False)
+		self.confocal_slice_selections = {}
+		for slice_name in self.confocal_model.slice_names:
+			self.confocal_slice_selections[slice_name] = tk.IntVar(value=1)
+			self.confocal_slice_menu.add_checkbutton(label=slice_name, variable=self.confocal_slice_selections[slice_name], onvalue=1, offvalue=0)
+		self.confocal_slice_button.configure(state='enabled')
 	
 	def cineTimeChanged(self):
 		"""Function to respond to timepoint adjustments in the base cine mesh / model
@@ -400,6 +413,16 @@ class modelGUI(tk.Frame):
 			return(False)
 		# Request PostView Launch
 		displayhelper.displayMeshPostview(feb_file_name)
+	
+	def stitchSlices(self):
+		"""Stitch selected slices into a large, combined image and save.
+		"""
+		stitch_slices = []
+		for slice_name, stitch_var in self.confocal_slice_selections.items():
+			if stitch_var.get():
+				stitch_slices.append(self.confocal_model.slice_names.index(slice_name))
+			
+		self.confocal_model.generateStitchedImages(slices=stitch_slices, channel=0)
 	
 	def intValidate(self, new_value):
 		"""Simple validation function to ensure an entry receives only int-able inputs or null

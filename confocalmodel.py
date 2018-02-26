@@ -35,14 +35,23 @@ class ConfocalModel():
 		
 		# Get all TIFF files in the directory
 		dirs = [(top_dir + '/' + sub_dir) for sub_dir in os.listdir(top_dir) if os.path.isdir(top_dir + '/' + sub_dir)]
+		self.top_dir = top_dir
 		self.slices = [ConfocalSlice(im_dir) for im_dir in dirs]
+		self.slice_names = [confocal_slice.slice_name for confocal_slice in self.slices]
 	
-	def generateStitchedImages(self, slices, sub_slices=[0], overlap=0.1, compress_ratio=0.25, channel=-1):
+	def generateStitchedImages(self, slices, sub_slices=[], overlap=0.1, compress_ratio=0.25, channel=-1, force_file=False):
 		"""Adjust image intensity based on edge intensity of adacent images.
 		"""
+		# Set subslices list to mid-slice if none is indicated.
 		for slice_num in slices:
+			if not len(sub_slices):
+				sub_slices = [int(self.slices[slice_num].num_slices / 2)]
 			for sub_slice in sub_slices:
-				self.slices[slice_num].createStitchedImage(overlap=overlap, compress_ratio=compress_ratio, channel=channel, frame=sub_slice)
+				file_name = self.top_dir + '/' + self.slice_names[slice_num] + 'Frame' + str(sub_slice) + 'Stitched.tif'
+				if (not os.path.isfile(file_name)) or force_file:
+					self.slices[slice_num].createStitchedImage(overlap=overlap, compress_ratio=compress_ratio, channel=channel, frame=sub_slice, stitched_file=file_name, force_file=force_file)
+				else:	
+					print('Image already exists! No need to overwrite.')
 		
 class ConfocalSlice():
 	"""Class to hold information for a single biological slice of tissue.
@@ -65,19 +74,24 @@ class ConfocalSlice():
 		
 		self.stitched_image_files = [None]*self.num_slices
 	
-	def createStitchedImage(self, overlap=0.1, compress_ratio=0.25, channel=-1, frame=0, stitched_file=False):
+	def createStitchedImage(self, overlap=0.1, compress_ratio=0.25, channel=-1, frame=0, stitched_file=False, force_file=False):
 		"""Stitch images together in a grid.
 		"""
 		self.im_locs, im_locs_dict = confocalhelper.getImagePositions(self.tif_files)
 		
 		self.im_grid = confocalhelper.getImageGrid(self.tif_files, self.im_locs, im_locs_dict)
 		
+		if not stitched_file:
+			stitched_file = self.confocal_dir + '/StitchedImages/' + self.slice_name + 'slice' + str(frame) + 'chan' + str(channel) + '.tif'
+		if os.path.isfile(stitched_file) and not force_file:
+			print('File exists! No need to overwrite.')
+			return(True)
+		
 		if not self.compressed_images[frame]:
 			self.compressed_images[frame] = [None]*len(self.raw_images)
 			
 		for image_num, raw_image in enumerate(self.raw_images):
 			image_frames = confocalhelper.splitImageFrames(raw_image)
-			print(len(image_frames))
 			image_frame = image_frames[frame]
 			img_channels = confocalhelper.splitChannels(image_frame)
 			if channel >= 0:
@@ -91,8 +105,5 @@ class ConfocalSlice():
 					self.compressed_images[frame][image_num] = compressed_image
 				else:
 					self.compressed_images[frame][image_num] = compressed_channels[0]
-		
-		if not stitched_file:
-			stitched_file = self.confocal_dir + '/' + self.slice_name + 'slice' + str(frame) + 'chan' + str(channel) + '.tif'
 			
 		stitched_success = confocalhelper.stitchImages(self.compressed_images[frame], self.im_grid[:, 0], self.im_grid[:, 1], save_pos=stitched_file)
