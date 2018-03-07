@@ -63,6 +63,7 @@ def stitchImages(images_in, image_x_inds, image_y_inds, overlap=0.1, save_pos=Fa
 		return(False)
 	stitched_image = Image.new('RGB', (int(x_range*(1-overlap)*tile_size[0]), int(y_range*(1-overlap)*tile_size[1])))
 	for image_num in range(len(images_in)):
+		print('Adding image: ' + str(image_num))
 		x_pos = int((x_range-image_x_inds[image_num])*(1-overlap)*tile_size[0])
 		y_pos = int(image_y_inds[image_num]*(1-overlap)*tile_size[1])
 		cur_image = images_in[image_num]
@@ -72,8 +73,11 @@ def stitchImages(images_in, image_x_inds, image_y_inds, overlap=0.1, save_pos=Fa
 			return(False)
 		stitched_image.paste(cur_image, (x_pos, y_pos))
 	if save_pos:
-		stitched_image.save(save_pos)
-		return(True)
+		try:
+			stitched_image.save(save_pos)
+			return(True)
+		except Exception as e:
+			raise(e)
 	else:
 		return(stitched_image)
 
@@ -133,3 +137,27 @@ def compressImages(images_in, image_scale=0.5):
 		new_size = [int(image_scale*dimension) for dimension in images_in.size]
 		compressed_image = images_in.resize(new_size, Image.LANCZOS)
 		return(compressed_image)
+		
+def readImageGrid(file_name):
+	"""Read image grid information from a file instead of pulling it from image file data.
+	"""
+	im_grid = np.empty([])
+	with open(file_name) as grid_file:
+		for file_line in grid_file.readlines():
+			cur_inds = np.array([int(ind.strip()) for ind in file_line.split(',')])
+			if im_grid.ndim:
+				im_grid = np.vstack((im_grid, cur_inds))
+			else:
+				im_grid = cur_inds
+	return(im_grid)
+	
+def writeImageGrid(image_grid, file_name):
+	"""Write image grid information to a file, to allow easier access.
+	"""
+	open(file_name, 'w').close()
+	with open(file_name, 'w') as grid_file:
+		for row in range(image_grid.shape[0]):
+			x_ind = image_grid[row, 0]
+			y_ind = image_grid[row, 1]
+			grid_file.write(str(x_ind) + ',' + str(y_ind) + '\n')
+	return(True)
