@@ -88,7 +88,6 @@ class ConfocalSlice():
 		# Either read or create the image grid file
 		if os.path.isfile(self.image_grid_file):
 			self.im_grid = confocalhelper.readImageGrid(self.image_grid_file)
-			print(self.im_grid)
 		else:
 			# If the image grid file does not exist, create it for future use.
 			self.im_locs, im_locs_dict = confocalhelper.getImagePositions(self.tif_files)
@@ -125,6 +124,6 @@ class ConfocalSlice():
 					self.compressed_images[frame][image_num] = compressed_image
 				else:
 					self.compressed_images[frame][image_num] = compressed_channels[0]
-		print('Images compressed!')
+
 		# Pass the compressed images, image grid information, and stitched file to save to the image stitching function
 		stitched_success = confocalhelper.stitchImages(self.compressed_images[frame], self.im_grid[:, 0], self.im_grid[:, 1], save_pos=stitched_file)
