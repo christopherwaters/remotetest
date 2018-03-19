@@ -39,19 +39,30 @@ class ConfocalModel():
 		self.slices = [ConfocalSlice(im_dir) for im_dir in dirs]
 		self.slice_names = [confocal_slice.slice_name for confocal_slice in self.slices]
 	
-	def generateStitchedImages(self, slices, sub_slices=[], overlap=0.1, compress_ratio=0.25, channel=-1, force_file=False):
+	def generateStitchedImages(self, slices, sub_slices, channel_list, overlap=0.1, compress_ratio=0.25, force_file=False):
 		"""Adjust image intensity based on edge intensity of adacent images.
 		"""
 		# Set subslices list to mid-slice if none is indicated.
-		for slice_num in slices:
-			if not len(sub_slices):
-				sub_slices = [int(self.slices[slice_num].num_slices / 2)]
-			for sub_slice in sub_slices:
+		for slice_ind, slice_num in enumerate(slices):
+			# Determine if the sub_slices list is per-slice, or a general list.
+			cur_sub_slices = sub_slices[slice_ind] if isinstance(sub_slices[slice_ind], list) else sub_slices
+			cur_slice_chans = channel_list[slice_ind] if isinstance(channel_list[slice_ind], list) else channel_list
+			for sub_slice in cur_sub_slices:
 				file_name = self.top_dir + '/' + self.slice_names[slice_num] + 'Frame' + str(sub_slice) + 'Stitched.tif'
 				if (not os.path.isfile(file_name)) or force_file:
-					self.slices[slice_num].createStitchedImage(overlap=overlap, compress_ratio=compress_ratio, channel=channel, frame=sub_slice, stitched_file=file_name, force_file=force_file)
+					self.slices[slice_num].createStitchedImage(overlap=overlap, compress_ratio=compress_ratio, channel=cur_slice_chans, frame=sub_slice, stitched_file=file_name, force_file=force_file)
 				else:	
 					print('Image already exists! No need to overwrite.')
+					
+	def getSubsliceList(self, top_slice):
+		"""Gather information about which sub-slices are present within each image.
+		"""
+		return(list(range(self.slices[top_slice].num_slices)))
+		
+	def getChannelList(self, top_slice):
+		"""Gather information about which channels are present within each image.
+		"""
+		return(list(self.slices[top_slice].channels))
 		
 class ConfocalSlice():
 	"""Class to hold information for a single biological slice of tissue.
@@ -73,6 +84,9 @@ class ConfocalSlice():
 		
 		# Define how many sub-slices (confocal slices) are contained within the overall slice
 		self.num_slices = self.raw_images[0].n_frames
+		
+		# Define the channels within the image
+		self.channels = self.raw_images[0].getbands()
 		
 		# Set up a list to hold compressed versions of the images, formatted as slices at top level
 		#		This is due to compression only working on a single slice
@@ -111,9 +125,9 @@ class ConfocalSlice():
 			# Pull the desired frame and channels
 			image_frames = confocalhelper.splitImageFrames(raw_image)
 			image_frame = image_frames[frame]
-			img_channels = confocalhelper.splitChannels(image_frame)
-			if channel >= 0:
-				img_channels = [img_channels[channel]]
+			img_channels_complete = confocalhelper.splitChannels(image_frame)
+			if isinstance(channel, list):
+				img_channels = [img_channels_complete[channel_num] for channel_num in channel]
 			# If being told to compress the images, compress to desired ratio
 			if compress_ratio < 1:
 				compressed_channels = [None]*len(img_channels)

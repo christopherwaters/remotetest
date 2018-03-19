@@ -16,6 +16,7 @@ import confocalmodel
 import mesh
 import numpy as np
 from cardiachelpers import displayhelper
+import math
 
 class modelGUI(tk.Frame):
 	"""Generates a GUI to control the Python-based cardiac modeling toolbox.
@@ -37,6 +38,8 @@ class modelGUI(tk.Frame):
 		
 		# On window close by user
 		master.protocol('WM_DELETE_WINDOW', self.destroy())
+		
+		self.master = master
 
 	def createWidgets(self):
 		"""Place widgets throughout GUI frame and assign functionality.
@@ -99,7 +102,7 @@ class modelGUI(tk.Frame):
 		self.confocal_slice_button.grid(row=4, column=7, columnspan=2)
 		#	Buttons to generate models
 		ttk.Button(text='Generate Confocal Model', command= lambda: self.createConfocalModel(confocal_dir_entry)).grid(row=3, column=7, columnspan=2)
-		ttk.Button(text='Stitch Selected Slices', command= lambda: self.stitchSlices()).grid(row=5, column=7, columnspan=2)
+		ttk.Button(text='Stitch Selected Slices', command= lambda: self.startStitching()).grid(row=5, column=7, columnspan=2)
 		
 		# Mesh Options / Creation
 		#	Place labels
@@ -414,15 +417,24 @@ class modelGUI(tk.Frame):
 		# Request PostView Launch
 		displayhelper.displayMeshPostview(feb_file_name)
 	
-	def stitchSlices(self):
+	def startStitching(self):
 		"""Stitch selected slices into a large, combined image and save.
 		"""
 		stitch_slices = []
 		for slice_name, stitch_var in self.confocal_slice_selections.items():
 			if stitch_var.get():
 				stitch_slices.append(self.confocal_model.slice_names.index(slice_name))
-			
-		self.confocal_model.generateStitchedImages(slices=stitch_slices, channel=0)
+		# Get subslice list	
+		sub_slices = [None]*len(stitch_slices)
+		for slice_num, cur_slice in enumerate(stitch_slices):
+			sub_slices[slice_num] = self.confocal_model.getSubsliceList(cur_slice)
+		# Get channel list
+		channels = [None]*len(stitch_slices)
+		for slice_num, cur_slice in enumerate(stitch_slices):
+			channels[slice_num] = self.confocal_model.getChannelList(cur_slice)
+		self._createSubsliceWindow(stitch_slices, sub_slices, channels)
+		return(True)
+		#self.confocal_model.generateStitchedImages(slices=stitch_slices, sub_slices = [0, 9, 16])
 	
 	def intValidate(self, new_value):
 		"""Simple validation function to ensure an entry receives only int-able inputs or null
@@ -436,6 +448,61 @@ class modelGUI(tk.Frame):
 			return(True)
 		except:
 			return(False)
+	
+	def _createSubsliceWindow(self, slice_list, subslice_list, channel_list):
+		"""Create a window to select subslices and channels.
+		"""
+		self.slice_menu = tk.Toplevel(self.master)
+		self.slice_menu.wm_title('Select Subslices and Channels')
+		
+		self.subslice_selections = {}
+		
+		for slice_num, slice_index in enumerate(slice_list):
+			self.slice_menu.columnconfigure(slice_num, pad=10)
+			ttk.Label(self.slice_menu, text=self.confocal_model.slice_names[slice_index]).grid(row=0, column=slice_num)
+			for sub_num, sub_slice in enumerate(subslice_list[slice_num]):
+				cur_string = self.confocal_model.slice_names[slice_index] + " Frame " + str(sub_slice)
+				self.subslice_selections[cur_string] = tk.IntVar(value=1)
+				ttk.Checkbutton(self.slice_menu, text="Frame " + str(sub_slice), variable=self.subslice_selections[cur_string]).grid(row=sub_num+1, column=slice_num)
+		
+		self.channel_selections = {}
+		farthest_column, lowest_row = self.slice_menu.grid_size()
+		# Place Channel List
+		for slice_num, slice_index in enumerate(slice_list):
+			ttk.Label(self.slice_menu, text='Channels').grid(row=lowest_row, column=slice_num)
+			for channel_num, channel in enumerate(channel_list[slice_num]):
+				cur_string = self.confocal_model.slice_names[slice_index] + ' ' + channel
+				self.channel_selections[cur_string] = tk.IntVar(value=1)
+				ttk.Checkbutton(self.slice_menu, text=channel, variable=self.channel_selections[cur_string]).grid(row=lowest_row+channel_num+1, column=slice_num)
+				
+		farthest_column, lowest_row = self.slice_menu.grid_size()
+		ttk.Button(self.slice_menu, text='Generate Stitched Image', command= lambda: self._stitchSlices(slice_list)).grid(row=lowest_row, column=math.ceil(farthest_column/2)-1, columnspan=2-(farthest_column % 2))
+		
+	def _stitchSlices(self, slice_list):
+		"""Actually iterate through and run the stitching process for each item selected by the user.
+		"""
+		subslice_list, channel_list = self.__getSubsChannels(slice_list)
+		self.confocal_model.generateStitchedImages(slice_list, subslice_list, channel_list)
+		
+	def __getSubsChannels(self, slice_list):
+		"""Get the subslices and channels based on the selections made in the slice selection window.
+		"""
+		sub_slices = [None]*len(slice_list)
+		slice_chans = [None]*len(slice_list)
+		for slice_num, slice_index in enumerate(slice_list):
+			subslice_list = self.confocal_model.getSubsliceList(slice_index)
+			channel_list = self.confocal_model.getChannelList(slice_index)
+			subslice_selected = [False]*len(subslice_list)
+			channel_selected = [False]*len(channel_list)
+			for sub_num, sub_slice in enumerate(subslice_list):
+				subslice_string = self.confocal_model.slice_names[slice_index] + " Frame " + str(sub_slice)
+				subslice_selected[sub_num] = self.subslice_selections[subslice_string].get()
+			for channel_num, channel in enumerate(channel_list):
+				channel_string = self.confocal_model.slice_names[slice_index] + ' ' + channel
+				channel_selected[channel_num] = self.channel_selections[channel_string].get()
+			sub_slices[slice_num] = list(np.where(subslice_selected)[0])
+			slice_chans[slice_num] = list(np.where(channel_selected)[0])
+		return([sub_slices, slice_chans])
 	
 root = tk.Tk()
 gui = modelGUI(master=root)
