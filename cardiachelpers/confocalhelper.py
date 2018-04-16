@@ -3,6 +3,11 @@ import numpy as np
 from PIL import Image
 from PIL import ImageOps
 from cardiachelpers import importhelper
+import skimage.filters
+import skimage.measure
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import os.path
 
 def splitChannels(images_in, pull_channel=-1):
 	"""Splits an image (or multiple images) to its different channels, then returns a nested list of the channels.
@@ -204,3 +209,60 @@ def writeImageGrid(image_grid, file_name):
 			# Write the locations to the file with a ',' separator and move to a new line
 			grid_file.write(str(x_ind) + ',' + str(y_ind) + '\n')
 	return(True)
+	
+def splitForeground(image_file):
+	image_in = Image.open(image_file)
+	image_split = image_in.split()
+	mask_list = [Image.new('1', image_split[0].size)]*len(image_split)
+	contours = [None]*len(image_split)
+	for i, image_chan in enumerate(image_split):
+		mask_list[i], contours[i] = _getThresholdMask(image_chan)
+		
+	save_dir, im_filename = os.path.split(image_file)
+	file_names = [None]*len(mask_list)
+	
+	for i, mask in enumerate(mask_list):
+		cur_file = im_filename.split('.')[0] + 'MaskChannel' + str(i) + '.png'
+		filename = os.path.join(save_dir, cur_file)
+		file_names[i] = filename
+		plt.imsave(filename, mask, cmap=cm.gray)
+	return([file_names, contours])
+	
+def _getThresholdMask(image_in):
+	image_arr = np.array(image_in)
+	
+	if np.any(image_arr):
+		thresh = skimage.filters.threshold_minimum(image_arr)
+		mask = image_arr > thresh
+		fr_filter_mask = skimage.filters.frangi(mask)
+		fr_filter_thresh = skimage.filters.threshold_otsu(fr_filter_mask)*0.25
+		contours = skimage.measure.find_contours(fr_filter_mask, fr_filter_thresh)
+		fr_thresh_mask = fr_filter_mask > fr_filter_thresh
+		return([fr_thresh_mask, contours])
+	else:
+		return([image_arr, [None]])
+	
+# Below here are attempts to do flat-field correction	
+def getImageGradient(image_file):
+	image_in = Image.open(image_file)
+	image_arr = np.array(image_in)
+	channel_arr = image_arr[:, :, 0]
+	img_mean = int(np.mean(channel_arr))
+	channel_ratio = img_mean / channel_arr
+	return(channel_ratio)
+	
+def multiplyImageGradient(image_file, gradient_arr):
+	image_in = Image.open(image_file)
+	image_arr = np.array(image_in)
+	mult_arr = np.zeros(image_arr.shape)
+	num_chans = image_arr.shape[2]
+	for chan in range(num_chans):
+		chan_arr = image_arr[:, :, chan]
+		mult_arr[:, :, chan] = np.multiply(chan_arr, gradient_arr)
+	mult_arr = np.round(mult_arr).astype('uint8')
+	ratio_image = Image.fromarray(mult_arr)
+	return(ratio_image)
+	
+def _smoothGradient(x_inds, y_inds, gradient_arr):
+	gradient_arr.shape
+	
