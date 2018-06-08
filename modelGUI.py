@@ -482,7 +482,7 @@ class modelGUI(tk.Frame):
 		"""Actually iterate through and run the stitching process for each item selected by the user.
 		"""
 		subslice_list, channel_list = self.__getSubsChannels(slice_list)
-		self.confocal_model.generateStitchedImages(slice_list, subslice_list, channel_list)
+		self.confocal_model.generateStitchedImages(slice_list, subslice_list, compress_ratio=1)
 		
 	def __getSubsChannels(self, slice_list):
 		"""Get the subslices and channels based on the selections made in the slice selection window.

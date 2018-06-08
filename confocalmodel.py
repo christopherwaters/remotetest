@@ -39,18 +39,17 @@ class ConfocalModel():
 		self.slices = [ConfocalSlice(im_dir) for im_dir in dirs]
 		self.slice_names = [confocal_slice.slice_name for confocal_slice in self.slices]
 	
-	def generateStitchedImages(self, slices, sub_slices, channel_list, overlap=0.1, compress_ratio=0.25, force_file=False):
+	def generateStitchedImages(self, slices, sub_slices, overlap=0.1, compress_ratio=0.25, force_file=False):
 		"""Adjust image intensity based on edge intensity of adacent images.
 		"""
 		# Set subslices list to mid-slice if none is indicated.
 		for slice_ind, slice_num in enumerate(slices):
 			# Determine if the sub_slices list is per-slice, or a general list.
 			cur_sub_slices = sub_slices[slice_ind] if isinstance(sub_slices[slice_ind], list) else sub_slices
-			cur_slice_chans = channel_list[slice_ind] if isinstance(channel_list[slice_ind], list) else channel_list
 			for sub_slice in cur_sub_slices:
 				file_name = self.top_dir + '/' + self.slice_names[slice_num] + 'Frame' + str(sub_slice) + 'Stitched.tif'
 				if (not os.path.isfile(file_name)) or force_file:
-					self.slices[slice_num].createStitchedImage(overlap=overlap, compress_ratio=compress_ratio, channel=cur_slice_chans, frame=sub_slice, stitched_file=file_name, force_file=force_file)
+					self.slices[slice_num].createStitchedImage(overlap=overlap, compress_ratio=compress_ratio, frame=sub_slice, stitched_file=file_name, force_file=force_file)
 				else:	
 					print('Image already exists! No need to overwrite.')
 					
@@ -96,7 +95,7 @@ class ConfocalSlice():
 		#		This file may or may not exist already in the directory, but is either referenced or created during stitching
 		self.image_grid_file = self.confocal_dir + '/stitch_grid.txt'
 	
-	def createStitchedImage(self, overlap=0.1, compress_ratio=0.25, channel=-1, frame=0, stitched_file=False, force_file=False):
+	def createStitchedImage(self, overlap=0.1, compress_ratio=0.25, frame=0, stitched_file=False, force_file=False):
 		"""Stitch images together in a grid.
 		"""
 		# Either read or create the image grid file
@@ -122,22 +121,11 @@ class ConfocalSlice():
 		
 		# Iterate through the images to generate compressed versions
 		for image_num, raw_image in enumerate(self.raw_images):
-			# Pull the desired frame and channels
-			image_frames = confocalhelper.splitImageFrames(raw_image)
-			image_frame = image_frames[frame]
-			img_channels_complete = confocalhelper.splitChannels(image_frame)
-			if isinstance(channel, list):
-				img_channels = [img_channels_complete[channel_num] for channel_num in channel]
+			# Pull the desired frame
+			image_frame = confocalhelper.splitImageFrames(raw_image)[frame] if frame < raw_image.n_frames else confocalhelper.splitImageFrames(raw_image)[0]
 			# If being told to compress the images, compress to desired ratio
-			if compress_ratio < 1:
-				compressed_channels = [None]*len(img_channels)
-				for channel_num, cur_channel in enumerate(img_channels):
-					compressed_channels[channel_num] = confocalhelper.compressImages(cur_channel, image_scale=compress_ratio)
-				if len(compressed_channels) > 1:
-					compressed_image = Image.merge('RGB', compressed_channels)
-					self.compressed_images[frame][image_num] = compressed_image
-				else:
-					self.compressed_images[frame][image_num] = compressed_channels[0]
+			compressed_frame = confocalhelper.compressImages(image_frame, image_scale=compress_ratio)
+			self.compressed_images[frame][image_num] = compressed_frame
 
 		# Pass the compressed images, image grid information, and stitched file to save to the image stitching function
-		stitched_success = confocalhelper.stitchImages(self.compressed_images[frame], self.im_grid[:, 0], self.im_grid[:, 1], save_pos=stitched_file)
+		stitched_success = confocalhelper.stitchImages(self.compressed_images[frame], self.im_grid[:, 0], self.im_grid[:, 1], save_pos=stitched_file, stitched_type='F')

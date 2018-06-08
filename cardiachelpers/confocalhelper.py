@@ -3,11 +3,14 @@ import numpy as np
 from PIL import Image
 from PIL import ImageOps
 from cardiachelpers import importhelper
+from skimage import io
 import skimage.filters
 import skimage.measure
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import os.path
+import warnings
+Image.MAX_IMAGE_PIXELS = None
 
 def splitChannels(images_in, pull_channel=-1):
 	"""Splits an image (or multiple images) to its different channels, then returns a nested list of the channels.
@@ -24,12 +27,12 @@ def splitChannels(images_in, pull_channel=-1):
 			# Slice array based on channels selected (channel = -1 indicates all channels)
 			if pull_channel >= 0 and pull_channel < num_channels:
 				# Rebuild an image from the sliced array to isolate the channel
-				split_images[i] = Image.fromarray(image_arr[:, :, pull_channel])
+				split_images[i] = Image.fromarray(image_arr[:, :, pull_channel], mode=im.mode)
 			else:
 				# Create a new image for each channel and store as a list
 				split_by_band = [None]*num_channels
 				for chan_ind in range(num_channels):
-					split_by_band[chan_ind] = Image.fromarray(image_arr[:, :, chan_ind])
+					split_by_band[chan_ind] = Image.fromarray(image_arr[:, :, chan_ind], mode=im.mode)
 				split_images[i] = split_by_band
 		return(split_images)
 	else:
@@ -39,12 +42,12 @@ def splitChannels(images_in, pull_channel=-1):
 		# Slice array based on channels selected (channel = -1 indicates all channels)
 		if pull_channel >= 0 and pull_channel < num_channels:
 			# Rebuild image from the sliced array to isolate the channel
-			split_by_band = Image.fromarray(image_arr[:, :, pull_channel])
+			split_by_band = Image.fromarray(image_arr[:, :, pull_channel], mode=images_in.mode)
 		else:
 			# Create a new image for each channel and store as a list
 			split_by_band = [None]*num_channels
 			for chan_ind in range(num_channels):
-				split_by_band[chan_ind] = Image.fromarray(image_arr[:, :, chan_ind])
+				split_by_band[chan_ind] = Image.fromarray(image_arr[:, :, chan_ind], mode=images_in.mode)
 		return(split_by_band)
 		
 def splitImageFrames(image_in):
@@ -59,7 +62,7 @@ def splitImageFrames(image_in):
 			# Iterate through frames and copy each frame independently, converting to RGB
 			for i in range(image.n_frames):
 				image.seek(i)
-				split_image[i] = image.copy() if image.mode == 'RGB' else image.copy().convert(mode='RGB')
+				split_image[i] = image.copy()
 			full_images.append(split_image)
 		return(full_images)
 	else:
@@ -67,10 +70,10 @@ def splitImageFrames(image_in):
 		# Iterate through frames and copy each frame independently, converting to RGB
 		for i in range(image_in.n_frames):
 			image_in.seek(i)
-			split_image[i] = image_in.copy() if image_in.mode == 'RGB' else image_in.copy().convert(mode='RGB')
+			split_image[i] = image_in.copy()
 		return(split_image)
 
-def stitchImages(images_in, image_x_inds, image_y_inds, overlap=0.1, save_pos=False):
+def stitchImages(images_in, image_x_inds, image_y_inds, overlap=0.1, stitched_type=False, save_pos=False):
 	"""Piece images together based on x and y indices to form a single large image.
 	"""
 	# Get the maximum number of images in each direction
@@ -86,7 +89,10 @@ def stitchImages(images_in, image_x_inds, image_y_inds, overlap=0.1, save_pos=Fa
 	else:
 		return(False)
 	# Create an image based on the width of the input image that should hold the full stitched image
-	stitched_image = Image.new('RGB', (int(x_range*(1-overlap)*tile_size[0]), int(y_range*(1-overlap)*tile_size[1])))
+	if not stitched_type:
+		stitched_type = first_sublist.mode
+	print(first_sublist.mode)
+	stitched_image = Image.new(stitched_type, (int(x_range*(1-overlap)*tile_size[0]), int(y_range*(1-overlap)*tile_size[1])))
 	# Iterating through each image, copy the information to the stitched image based on position
 	for image_num in range(len(images_in)):
 		# Calculate X and Y positions for the image
@@ -171,12 +177,12 @@ def compressImages(images_in, image_scale=0.5):
 		new_size = [int(image_scale*dimension) for dimension in images_in[0].size]
 		# Iterate through images and resize using Lanczos reconstruction
 		for image_num in range(len(images_in)):
-			compressed_images[image_num] = images_in[image_num].resize(new_size, Image.LANCZOS)
+			compressed_images[image_num] = images_in[image_num].resize(new_size, Image.LANCZOS) if not(image_scale == 1) else images_in[image_num]
 		return(compressed_images)
 	else:
 		# Establish new size from ratio and resize image using Lanczos reconstruction
 		new_size = [int(image_scale*dimension) for dimension in images_in.size]
-		compressed_image = images_in.resize(new_size, Image.LANCZOS)
+		compressed_image = images_in.resize(new_size, Image.LANCZOS) if not(image_scale == 1) else images_in
 		return(compressed_image)
 		
 def readImageGrid(file_name):
@@ -212,21 +218,23 @@ def writeImageGrid(image_grid, file_name):
 	
 def splitForeground(image_file):
 	image_in = Image.open(image_file)
-	image_split = image_in.split()
-	mask_list = [Image.new('1', image_split[0].size)]*len(image_split)
-	contours = [None]*len(image_split)
-	for i, image_chan in enumerate(image_split):
-		mask_list[i], contours[i] = _getThresholdMask(image_chan)
+	image_in = compressImages(image_in)
+	mask = Image.new('1', image_in.size)
+	mask, contour = _getThresholdMask(image_in)
 		
 	save_dir, im_filename = os.path.split(image_file)
-	file_names = [None]*len(mask_list)
 	
-	for i, mask in enumerate(mask_list):
-		cur_file = im_filename.split('.')[0] + 'MaskChannel' + str(i) + '.png'
-		filename = os.path.join(save_dir, cur_file)
-		file_names[i] = filename
-		plt.imsave(filename, mask, cmap=cm.gray)
-	return([file_names, contours])
+	cur_file = im_filename.split('.')[0] + '_FGMask.png'
+	filename = os.path.join(save_dir, cur_file)
+	plt.imsave(filename, mask, cmap=cm.gray)
+	return([filename, contour])
+	
+def openModelImage(image_file):
+	"""Opens a 32-bit image stack representing a full stack of confocal slices for a heart.
+	"""
+	full_arr = io.imread(image_file)
+	im_list = [Image.fromarray(full_arr[i, :, :]) for i in range(full_arr.shape[0])] if full_arr.ndim > 2 else Image.fromarray(full_arr)
+	return(im_list)
 	
 def _getThresholdMask(image_in):
 	image_arr = np.array(image_in)
@@ -241,28 +249,3 @@ def _getThresholdMask(image_in):
 		return([fr_thresh_mask, contours])
 	else:
 		return([image_arr, [None]])
-	
-# Below here are attempts to do flat-field correction	
-def getImageGradient(image_file):
-	image_in = Image.open(image_file)
-	image_arr = np.array(image_in)
-	channel_arr = image_arr[:, :, 0]
-	img_mean = int(np.mean(channel_arr))
-	channel_ratio = img_mean / channel_arr
-	return(channel_ratio)
-	
-def multiplyImageGradient(image_file, gradient_arr):
-	image_in = Image.open(image_file)
-	image_arr = np.array(image_in)
-	mult_arr = np.zeros(image_arr.shape)
-	num_chans = image_arr.shape[2]
-	for chan in range(num_chans):
-		chan_arr = image_arr[:, :, chan]
-		mult_arr[:, :, chan] = np.multiply(chan_arr, gradient_arr)
-	mult_arr = np.round(mult_arr).astype('uint8')
-	ratio_image = Image.fromarray(mult_arr)
-	return(ratio_image)
-	
-def _smoothGradient(x_inds, y_inds, gradient_arr):
-	gradient_arr.shape
-	
