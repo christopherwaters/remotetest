@@ -26,6 +26,8 @@ class modelGUI(tk.Frame):
 		tk.Frame.__init__(self, master)
 		self.grid()
 		self.createWidgets()
+		self.scar_assign = False
+		self.dense_assign = False
 		
 		# Set row and column paddings
 		master.rowconfigure(0, pad=5)
@@ -138,10 +140,12 @@ class modelGUI(tk.Frame):
 		self.meshButton = ttk.Button(text='Generate Model First', state='disabled', command= lambda: self.createMRIMesh(num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox))
 		self.scar_fe_button = ttk.Button(text='Identify scar nodes', state='disabled', command= lambda: self.scarElem())
 		self.dense_fe_button = ttk.Button(text='Assign element displacements', state='disabled', command= lambda: self.denseElem())
+		self.scar_dense_button = ttk.Button(text='Get scar region DENSE average', state='disabled', command= lambda: self.scarDense())
 		#	Place mesh option buttons
 		self.meshButton.grid(row=9, column=10, columnspan=2)
 		self.scar_fe_button.grid(row=10, column=10, columnspan=2)
 		self.dense_fe_button.grid(row=11, column=10, columnspan=2)
+		self.scar_dense_button.grid(row=12, column=10, columnspan=2)
 
 		# FEBio File Creation
 		#	Place labels
@@ -376,12 +380,28 @@ class modelGUI(tk.Frame):
 		"""
 		time_point = int(self.cine_timepoint_cbox.get())
 		self.mri_mesh.assignScarElems(self.mri_model.aligned_scar[time_point], conn_mat = self.conn_mat_cbox.get())
+		if not self.scar_assign:
+			self.scar_assign = True
+		if self.dense_assign and self.scar_assign:
+			self.scar_dense_button.configure(state='normal')
 	
 	def denseElem(self):
 		"""Requests mesh to assign DENSE information to all applicable elements
 		"""
 		time_point = int(self.cine_timepoint_cbox.get())
-		self.mri_mesh.assignDenseElems(self.mri_model.dense_aligned_pts, self.mri_model.dense_slices, self.mri_model.dense_aligned_displacement)
+		self.mri_mesh.assignDenseElems(self.mri_model.dense_aligned_pts, self.mri_model.dense_slices, self.mri_model.dense_aligned_displacement, self.mri_model.radial_strain, self.mri_model.circumferential_strain)
+		if not self.dense_assign:
+			self.dense_assign = True
+		if self.dense_assign and self.scar_assign:
+			self.scar_dense_button.configure(state='normal')
+	
+	def scarDense(self):
+		scar_average_dense = [None]*len(self.mri_model.dense_aligned_displacement)
+		remote_average_dense = [None]*len(self.mri_model.dense_aligned_displacement)
+		for time_point in list(range(len(self.mri_model.dense_aligned_displacement))):
+			scar_average_dense[time_point] = self.mri_mesh.getElemData(self.mri_mesh.elems_in_scar, 'dense', timepoint=int(self.dense_timepoint_cbox.get())).tolist()`
+			remote_average_dense[time_point] = self.mri_mesh.getElemData(self.mri_mesh.elems_out_scar, 'dense', timepoint=int(self.dense_timepoint_cbox.get())).tolist()
+		messagebox.showinfo('DENSE Values', 'Scar Values: ' + str(scar_average_dense) + '\nRemote Values: ' + str(remote_average_dense))
 	
 	def genFebFile(self):
 		"""Generate FEBio file in indicated location

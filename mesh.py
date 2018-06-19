@@ -63,8 +63,11 @@ class Mesh():
 		self.scar_elems = []
 		self.dense_x_displacements = []
 		self.dense_y_displacements = []
+		self.dense_radial_strain = []
+		self.dense_circumferential_strain = []
 		self.nodes_in_scar = np.array([])
 		self.elems_in_scar = np.array([])
+		self.elems_out_scar = np.array([])
 	
 	def fitContours(self, all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, mesh_type):
 		"""Function to Perform the Contour Fitting from the Passed Endo and Epi Contour data.
@@ -303,10 +306,11 @@ class Mesh():
 		elem_scar_mask = np.reshape(np.in1d(elem_con, self.nodes_in_scar), elem_con.shape)
 		elem_node_ct = np.sum(elem_scar_mask, axis=1)
 		self.elems_in_scar = np.where(elem_node_ct >= num_nodes)[0]
+		self.elems_out_scar = np.where(elem_node_ct < num_nodes)[0]
 		
 		return([self.nodes_in_scar, self.elems_in_scar])
 	
-	def assignDenseElems(self, dense_pts, dense_slices, dense_displacement_all, conn_mat='hex'):
+	def assignDenseElems(self, dense_pts, dense_slices, dense_displacement_all, radial_strain, circumferential_strain, conn_mat='hex'):
 		"""Assign DENSE dx and dy values to elements within the field.
 		
 		Assignment of DENSE is done based on DENSE value at center of element. Interpolation is
@@ -352,14 +356,25 @@ class Mesh():
 		# Iterate through each timepoint to calculate an interpolation of DENSE values
 		elem_displacements_x = [[np.nan for i in range(len(dense_displacement_all))] for j in range(elem_con.shape[0])]
 		elem_displacements_y = [[np.nan for i in range(len(dense_displacement_all))] for j in range(elem_con.shape[0])]
+		elem_radial_strain = [[np.nan for i in range(len(radial_strain))] for j in range(elem_con.shape[0])]
+		elem_circumferential_strain = [[np.nan for i in range(len(circumferential_strain))] for j in range(elem_con.shape[0])]
 		for time_point in range(len(dense_displacement_all)):
 			dense_disp_timepoint = dense_displacement_all[time_point]
+			rad_strain_timepoint = radial_strain[time_point]
+			circ_strain_timepoint = circumferential_strain[time_point]
 			dense_cur_disp = np.array([])
+			dense_cur_rad = np.array([])
+			dense_cur_circ = np.array([])
 			for slice_num in range(len(dense_disp_timepoint)):
 				if dense_cur_disp.size:
 					dense_cur_disp = np.append(dense_cur_disp, dense_disp_timepoint[slice_num], axis=0)
+					dense_cur_rad = np.append(dense_cur_rad, rad_strain_timepoint[slice_num], axis=0)
+					dense_cur_circ = np.append(dense_cur_circ, circ_strain_timepoint[slice_num], axis=0)
 				else:
 					dense_cur_disp = dense_disp_timepoint[slice_num]
+					dense_cur_rad = rad_strain_timepoint[slice_num]
+					dense_cur_circ = circ_strain_timepoint[slice_num]
+			# Interpolate element displacements
 			elem_interp_dx = sp.interpolate.griddata(dense_pts_prol, dense_cur_disp[:, 0], elem_pts_interp, method='linear')
 			elem_interp_dy = sp.interpolate.griddata(dense_pts_prol, dense_cur_disp[:, 1], elem_pts_interp, method='linear')
 			elem_interp_nans = np.where(np.isnan(elem_interp_dx))[0]
@@ -368,13 +383,43 @@ class Mesh():
 			for elem_num in range(len(elems_in_dense)):
 				elem_displacements_x[elems_in_dense[elem_num]][time_point] = elem_interp_dx[elem_num]
 				elem_displacements_y[elems_in_dense[elem_num]][time_point] = elem_interp_dy[elem_num]
+			# Interpolate element strains
+			elem_interp_radial = sp.interpolate.griddata(dense_pts_prol, dense_cur_rad, elem_pts_interp, method='linear')
+			elem_interp_circumferential = sp.interpolate.griddata(dense_pts_prol, dense_cur_circ, elem_pts_interp, method='linear')
+			elem_interp_radial[elem_interp_nans] = sp.interpolate.griddata(dense_pts_prol, dense_cur_rad, elem_pts_interp[elem_interp_nans, :], method='nearest')
+			elem_interp_circumferential[elem_interp_nans] = sp.interpolate.griddata(dense_pts_prol, dense_cur_circ, elem_pts_interp[elem_interp_nans, :], method='nearest')
+			for elem_num in range(len(elems_in_dense)):
+				elem_radial_strain[elems_in_dense[elem_num]][time_point] = elem_interp_radial[elem_num]
+				elem_circumferential_strain[elems_in_dense[elem_num]][time_point] = elem_interp_circumferential[elem_num]
 			
 		# Do this as a list, set up list on creation with NaNs and fill here. Allows more open adjustments.
 		self.dense_x_displacements = np.array(elem_displacements_x)
 		self.dense_y_displacements = np.array(elem_displacements_y)
+		self.dense_radial_strain = np.array(elem_radial_strain)
+		self.dense_circumferential_strain = np.array(elem_circumferential_strain)
 			
 		return(elem_displacements_x, elem_displacements_y)
 		
+	def getElemData(self, elem_list, data_out, average=True, timepoint=0):
+		data_types = ['dense']
+		if data_out not in data_types:
+			raise('Data type not present in the current model. Please select a different inquiry.')
+		if data_out == 'dense':
+			if timepoint != int(timepoint):
+				raise('Timepoint must be an integer value for dense interpretation.')
+			else:
+				timepoint = int(timepoint)
+		elem_data_list = [None]*len(elem_list)
+		if data_out == 'dense':
+			for elem_ind, elem in enumerate(elem_list):
+				elem_dense_val = [self.dense_radial_strain[elem][timepoint], self.dense_circumferential_strain[elem][timepoint]]
+				elem_data_list[elem_ind] = elem_dense_val
+			elem_data_arr = np.asarray(elem_data_list)
+			if average:
+				return(np.nanmean(elem_data_arr, axis=0))
+			else:
+				return(elem_data_arr)
+	
 	def generateFEFile(self, input_file, conn_mat='hex'):
 		"""Generate FEBio output file for use in FEBio and PostView.
 		"""

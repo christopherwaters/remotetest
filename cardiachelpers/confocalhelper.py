@@ -91,7 +91,6 @@ def stitchImages(images_in, image_x_inds, image_y_inds, overlap=0.1, stitched_ty
 	# Create an image based on the width of the input image that should hold the full stitched image
 	if not stitched_type:
 		stitched_type = first_sublist.mode
-	print(first_sublist.mode)
 	stitched_image = Image.new(stitched_type, (int(x_range*(1-overlap)*tile_size[0]), int(y_range*(1-overlap)*tile_size[1])))
 	# Iterating through each image, copy the information to the stitched image based on position
 	for image_num in range(len(images_in)):
@@ -118,6 +117,39 @@ def stitchImages(images_in, image_x_inds, image_y_inds, overlap=0.1, stitched_ty
 		# Don't save the image, but return it as an Image object
 		return(stitched_image)
 
+def stitchImagesAbsolute(images_in, image_x_pos, image_y_pos, stitched_type=False, save_pos=False):
+	x_max_image = np.where(image_x_pos == max(image_x_pos))[0][0]
+	y_max_image = np.where(image_y_pos == max(image_y_pos))[0][0]
+	x_size = max(image_x_pos) + images_in[x_max_image].size[0]
+	y_size = max(image_y_pos) + images_in[y_max_image].size[1]
+	# Pull the first image to be stitched
+	first_sublist = images_in[0]
+	while isinstance(first_sublist, list):
+		first_sublist = first_sublist[0]
+	# Get the size of the tiling from the input image
+	if isinstance(first_sublist, Image.Image):
+		tile_size = first_sublist.size
+	else:
+		return(False)
+	# Create an image based on the width of the input image that should hold the full stitched image
+	if not stitched_type:
+		stitched_type = first_sublist.mode
+	stitched_image = Image.new(stitched_type, (x_size, y_size))
+	for image_num, cur_image in enumerate(images_in):
+		x_pos = image_x_pos[image_num]
+		y_pos = image_y_pos[image_num]
+		stitched_image.paste(cur_image, (x_pos, y_pos))
+	if save_pos:
+		try:
+			# Save the image to the indicated file
+			stitched_image.save(save_pos)
+			return(True)
+		except Exception as e:
+			raise(e)
+	else:
+		# Don't save the image, but return it as an Image object
+		return(stitched_image)
+		
 def getImagePositions(image_files):
 	"""Small function to pull image position data from Volocity-exported TIF files.
 	"""

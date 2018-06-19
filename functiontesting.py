@@ -1,16 +1,34 @@
-from cardiachelpers import confocalhelper
-from cardiachelpers import lcn
+import mrimodel
+import confocalmodel
+import mesh
 import numpy as np
-from PIL import Image
+import warnings
 
-for slice_num in range(204):
-	
-	image_file = 'C:/Users/cdw2be/Documents/LCNTest/Slice 3/HeartPIMicrospheres-031418-Slice3 (raw tile '+str(slice_num+1) + ').tif'
+sa_filename = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-Chris-PinPts.mat'
+la_filename = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-LAPinPts.mat'
+lge_filename = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-Scar.mat'
+dense_filenames = ['C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-DENSE-Z5_4.mat', 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-DENSE-Z6_4.mat']
 
-	lcn_test_arr = np.array(confocalhelper.openModelImage(image_file)[19])
+mri_model = mrimodel.MRIModel(sa_filename, la_filename, scar_file=lge_filename, dense_file=dense_filenames)
+mri_model.importCine(timepoint=0)
+mri_model.importLGE()
+with warnings.catch_warnings():
+	warnings.simplefilter('ignore')
+	for i in range(len(mri_model.cine_endo)):
+		mri_model.alignScarCine(timepoint=i)
+mri_model.importDense()
+mri_model.alignDense(cine_timepoint=0)
 
-	lcn_test_kernel = lcn.create_kernel(25, 25)
-	lcn_post_arr = lcn.lcn(lcn_test_arr, lcn_test_kernel)
-	lcn_post_image = Image.fromarray(lcn_post_arr)
-	file_name = 'C:/Users/cdw2be/Documents/LCNTest/SingleFrame/Frame'+str(slice_num+1)+'.tif'
-	lcn_post_image.save(file_name)
+num_rings = 14
+elem_per_ring = 25
+elem_in_wall = 5
+mesh_type = '4x2'
+time_point = 0
+
+mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
+mri_mesh.fitContours(mri_model.cine_endo[time_point], mri_model.cine_epi[time_point], mri_model.cine_apex_pt, mri_model.cine_basal_pt, mri_model.cine_septal_pts, mesh_type)
+mri_mesh.feMeshRender()
+mri_mesh.nodeNum(mri_mesh.meshCart[0], mri_mesh.meshCart[1], mri_mesh.meshCart[2])
+mri_mesh.getElemConMatrix()
+mri_mesh.assignScarElems(mri_model.aligned_scar[time_point], conn_mat = 'hex')
+mri_mesh.assignDenseElems(mri_model.dense_aligned_pts, mri_model.dense_slices, mri_model.dense_aligned_displacement, mri_model.radial_strain, mri_model.circumferential_strain)

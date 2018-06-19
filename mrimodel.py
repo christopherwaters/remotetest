@@ -40,13 +40,6 @@ class MRIModel():
 		*_slices (list): List of slices that were traced in SEGMENT for the data set indicated by *
 		scar_ratio (array): Ratio of scar versus wall thickness by angle bins
 		aligned_scar (array): The scar contour mapped from LGE to cine stack
-	
-	TODO:
-		Import DENSE MRI Data
-		Adjust import system to allow selection of individual timepoints instead of averaging!
-			This means converting cine_endo to a 4-dimensional array? I think.
-			Import all timepoints simultaneously, then allow selection. This simplifies things.
-			Averaging occurs in the conversion to polar coordinates.
 	"""
 	
 	def __init__(self, cine_file, la_file, scar_file=None, dense_file=None):
@@ -102,6 +95,8 @@ class MRIModel():
 		self.dense_slices = []
 		self.dense_aligned_pts = []
 		self.dense_aligned_displacement = []
+		self.radial_strain = []
+		self.circumferential_strain = []
 	
 	def importCine(self, timepoint=0):
 		"""Import the black-blood cine stack.
@@ -210,6 +205,8 @@ class MRIModel():
 		dense_pts = [None]*len(self.dense_file)
 		slice_locations = [None]*len(self.dense_file)
 		dense_displacement = False
+		radial_strain = False
+		circumferential_strain = False
 		
 		for i in range(len(self.dense_file)):
 			dense_file = self.dense_file[i]
@@ -256,23 +253,37 @@ class MRIModel():
 			dense_dx = np.array(dense_data['DisplacementInfo']['dX'])
 			dense_dy = np.array(dense_data['DisplacementInfo']['dY'])
 			dense_dz = np.array(dense_data['DisplacementInfo']['dZ'])
+			dense_radial = np.array(dense_data['StrainInfo']['RR'])
+			dense_circumferential = np.array(dense_data['StrainInfo']['CC'])
 			
-			# Add DENSE displacement slices by time
+			# Add DENSE displacement and strain slices by time
 			if not dense_displacement:
 				dense_displacement = [None] * dense_dx.shape[1]
+				radial_strain = [None] * dense_radial.shape[1]
+				circumferential_strain = [None]*dense_circumferential.shape[1]
 				for i in range(dense_dx.shape[1]):
 					dense_displacement[i] = np.column_stack((dense_dx[:, i], dense_dy[:, i], dense_dz[:, i]))
+				for i in range(dense_radial.shape[1]):
+					radial_strain[i] = dense_radial[:, i]
+				for i in range(dense_circumferential.shape[1]):
+					circumferential_strain[i] = dense_circumferential[:, i]
 			else:
 				for i in range(dense_dx.shape[1]):
 					cur_disp = np.column_stack((dense_dx[:, i], dense_dy[:, i], dense_dz[:, i]))
 					dense_displacement[i] = [dense_displacement[i], cur_disp]
-		
+				for i in range(dense_radial.shape[1]):
+					cur_rad_strain = dense_radial[:, i]
+					radial_strain[i] = [radial_strain[i], cur_rad_strain]
+				for i in range(dense_circumferential.shape[1]):
+					cur_circ_strain = dense_circumferential[:, i]
+					circumferential_strain[i] = [circumferential_strain[i], cur_circ_strain]
 		self.dense_endo = dense_endo
 		self.dense_epi = dense_epi
 		self.dense_pts = dense_pts
 		self.dense_displacement = dense_displacement
 		self.dense_slices = slice_locations
-		
+		self.radial_strain = radial_strain
+		self.circumferential_strain = circumferential_strain
 		return(True)
 	
 	def alignScarCine(self, timepoint=0):
