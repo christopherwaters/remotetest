@@ -288,7 +288,7 @@ class Mesh():
 			center_matrix (array): The center of the elements defined by conn_mat that are in the scar
 		"""
 		# Set number of nodes needed for element to be in scar
-		num_nodes = 3
+		num_nodes = 1
 		
 		# Convert the scar contour to prolate coordinates
 		scar_contour = [scar_contour_i for scar_contour_i in scar_contour if scar_contour_i.size > 0]
@@ -401,20 +401,35 @@ class Mesh():
 		return(elem_displacements_x, elem_displacements_y)
 		
 	def getElemData(self, elem_list, data_out, average=True, timepoint=0):
+		"""Get specified data about the listed elements, returned as an array based on the type of data requested.
+		
+		args:
+			elem_list: A list of element indices to be references for the desired data.
+			data_out: A string representing the kind of information requested (DENSE, ie).
+			average: A boolean about whether or not to average the data across the elements or return data from every element (default True).
+			timepoint: Only used for certain data, but selects the timepoint desired (default 0).
+		"""
+		# A list of currently available data types
 		data_types = ['dense']
+		# Compare available data types to requested type to determine availability
 		if data_out not in data_types:
 			raise('Data type not present in the current model. Please select a different inquiry.')
+		# Pre-allocate a list for each element
+		elem_data_list = [None]*len(elem_list)
+		# If the requested data type is DENSE
 		if data_out == 'dense':
+			# Determine if timepoint is valid and convert to appropriate data type
 			if timepoint != int(timepoint):
 				raise('Timepoint must be an integer value for dense interpretation.')
 			else:
 				timepoint = int(timepoint)
-		elem_data_list = [None]*len(elem_list)
-		if data_out == 'dense':
+			# Iterate through the elements and collect the DENSE-based strain information
 			for elem_ind, elem in enumerate(elem_list):
 				elem_dense_val = [self.dense_radial_strain[elem][timepoint], self.dense_circumferential_strain[elem][timepoint]]
 				elem_data_list[elem_ind] = elem_dense_val
+			# Convert the element data to an array for manipulation
 			elem_data_arr = np.asarray(elem_data_list)
+			# Average or don't average the data, then return it
 			if average:
 				return(np.nanmean(elem_data_arr, axis=0))
 			else:

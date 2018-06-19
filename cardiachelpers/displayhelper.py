@@ -252,3 +252,13 @@ def displayMeshPostview(file_name):
 	"""
 	p = subprocess.Popen(['C://Program Files/postview-2.1.0/PostView2.exe', file_name])
 	return(p)
+	
+def plotListData(input_list, title_list, ax=None):
+	if not ax:
+		fig = mplt.figure()
+		ax = fig.add_subplot(111)
+	for input_vals in input_list:
+		x_vals = list(range(len(input_vals)))
+		ax.plot(x_vals, input_vals)
+	ax.legend(title_list)
+	return(ax)

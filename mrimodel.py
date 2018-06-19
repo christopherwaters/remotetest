@@ -197,7 +197,7 @@ class MRIModel():
 		return(True)
 		
 	def importDense(self):
-		"""Imports DENSE MR data.
+		"""Imports DENSE MR data from the file established at initialization.
 		"""
 		
 		dense_endo = [None]*len(self.dense_file)
@@ -249,7 +249,7 @@ class MRIModel():
 			
 			all_dense_theta, all_dense_rho = mathhelper.cart2pol(dense_x, dense_y)
 			
-			# Get displacement info and store as a 2-D array
+			# Get displacement / strain info and store as a 2-D array
 			dense_dx = np.array(dense_data['DisplacementInfo']['dX'])
 			dense_dy = np.array(dense_data['DisplacementInfo']['dY'])
 			dense_dz = np.array(dense_data['DisplacementInfo']['dZ'])

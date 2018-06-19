@@ -398,10 +398,15 @@ class modelGUI(tk.Frame):
 	def scarDense(self):
 		scar_average_dense = [None]*len(self.mri_model.dense_aligned_displacement)
 		remote_average_dense = [None]*len(self.mri_model.dense_aligned_displacement)
-		for time_point in list(range(len(self.mri_model.dense_aligned_displacement))):
-			scar_average_dense[time_point] = self.mri_mesh.getElemData(self.mri_mesh.elems_in_scar, 'dense', timepoint=int(self.dense_timepoint_cbox.get())).tolist()`
-			remote_average_dense[time_point] = self.mri_mesh.getElemData(self.mri_mesh.elems_out_scar, 'dense', timepoint=int(self.dense_timepoint_cbox.get())).tolist()
-		messagebox.showinfo('DENSE Values', 'Scar Values: ' + str(scar_average_dense) + '\nRemote Values: ' + str(remote_average_dense))
+		for time_point in range(len(self.mri_model.dense_aligned_displacement)):
+			scar_average_dense[time_point] = self.mri_mesh.getElemData(self.mri_mesh.elems_in_scar, 'dense', timepoint=time_point).tolist()
+			remote_average_dense[time_point] = self.mri_mesh.getElemData(self.mri_mesh.elems_out_scar, 'dense', timepoint=time_point).tolist()
+		scar_radial = [scar_dense[0] for scar_dense in scar_average_dense]
+		scar_circ = [scar_dense[1] for scar_dense in scar_average_dense]
+		remote_radial = [remote_dense[0] for remote_dense in remote_average_dense]
+		remote_circ = [remote_dense[1] for remote_dense in remote_average_dense]
+		displayhelper.plotListData([scar_radial, remote_radial], ['Scar', 'Remote'])
+		displayhelper.plotListData([scar_circ, remote_circ], ['Scar', 'Remote'])
 	
 	def genFebFile(self):
 		"""Generate FEBio file in indicated location
