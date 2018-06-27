@@ -3,6 +3,7 @@ import confocalmodel
 import mesh
 import numpy as np
 import warnings
+from cardiachelpers import displayhelper
 
 sa_filename = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-Chris-PinPts.mat'
 la_filename = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-LAPinPts.mat'
@@ -32,3 +33,12 @@ mri_mesh.nodeNum(mri_mesh.meshCart[0], mri_mesh.meshCart[1], mri_mesh.meshCart[2
 mri_mesh.getElemConMatrix()
 mri_mesh.assignScarElems(mri_model.aligned_scar[time_point], conn_mat = 'hex')
 mri_mesh.assignDenseElems(mri_model.dense_aligned_pts, mri_model.dense_slices, mri_model.dense_aligned_displacement, mri_model.radial_strain, mri_model.circumferential_strain)
+
+dense_elems = np.where(~np.isnan(mri_mesh.dense_radial_strain[:, 0]))[0]
+
+mesh_axes = displayhelper.surfaceRender(mri_mesh.endo_node_matrix, mri_mesh.focus)
+mesh_axes = displayhelper.surfaceRender(mri_mesh.epi_node_matrix, mri_mesh.focus, mesh_axes)
+
+dense_nodes = np.unique(mri_mesh.hex[dense_elems, :])
+
+mesh_axes = displayhelper.nodeRender(mri_mesh.nodes[dense_nodes, :], mesh_axes)

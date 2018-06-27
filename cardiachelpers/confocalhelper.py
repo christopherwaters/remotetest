@@ -2,14 +2,19 @@ import scipy.ndimage
 import numpy as np
 from PIL import Image
 from PIL import ImageOps
+from PIL import ImageFilter
 from cardiachelpers import importhelper
+from cardiachelpers import mathhelper
 from skimage import io
 import skimage.filters
 import skimage.measure
+import skimage.morphology
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import os.path
 import warnings
+import math
+from scipy import interpolate as spinterp
 Image.MAX_IMAGE_PIXELS = None
 
 def splitChannels(images_in, pull_channel=-1):
@@ -267,6 +272,47 @@ def openModelImage(image_file):
 	full_arr = io.imread(image_file)
 	im_list = [Image.fromarray(full_arr[i, :, :]) for i in range(full_arr.shape[0])] if full_arr.ndim > 2 else Image.fromarray(full_arr)
 	return(im_list)
+
+def skeletonizeImage(input_image):
+	binary_array = np.array(input_image) > 0
+	skeleton_contour = skimage.morphology.skeletonize(binary_array)
+	return(skeleton_contour)
+	
+def contourMaskImage(mask_image):
+	edge_contour = skimage.filters.scharr (mask_image)
+	skeleton_contour = skeletonizeImage(edge_contour)
+	return(skeleton_contour)
+	
+def splitImageObjects(binary_arr):
+	connecting_mat = scipy.ndimage.generate_binary_structure(2, 2)
+	labeled_arr, num_features = scipy.ndimage.label(binary_arr, structure=connecting_mat)
+	path_1 = np.array(np.where(labeled_arr == 1)).swapaxes(0, 1)
+	path_2 = np.array(np.where(labeled_arr == 2)).swapaxes(0, 1)
+	endo_path = path_1 if path_1.size < path_2.size else path_2
+	epi_path = path_1 if path_1.size > path_2.size else path_2
+	return(endo_path, epi_path, labeled_arr)
+
+def smoothPathTrace(pt_path):
+	center_pt = np.mean(pt_path, axis=0)
+	shifted_path = np.array([pt_path[i, :] - center_pt for i in range(pt_path.shape[0])])
+	
+	interp_theta_rads = np.linspace(0, 2*math.pi, 360)
+	averaging_theta_rads = np.linspace(0, 2*math.pi, 30)
+	averaging_theta_bins = [[averaging_theta_rads[i], averaging_theta_rads[i+1]] for i in range(len(averaging_theta_rads)-1)]
+	
+	path_theta, path_rho = mathhelper.cart2pol(shifted_path[:, 0], shifted_path[:, 1])
+	
+	#path_interp_eq = spinterp.interp1d(path_theta, path_rho, kind='linear', bounds_error=False, fill_value='extrapolate')
+	path_theta_sort_inds = np.argsort(path_theta, kind='mergesort')
+	path_interp_eq = spinterp.UnivariateSpline(path_theta[path_theta_sort_inds], path_rho[path_theta_sort_inds], k=1)
+	
+	path_interp_rho = path_interp_eq(interp_theta_rads)
+
+	smoothed_x, smoothed_y = mathhelper.pol2cart(interp_theta_rads, path_interp_rho)
+	smoothed_x = np.append(smoothed_x, smoothed_x[0])
+	smoothed_y = np.append(smoothed_y, smoothed_y[0])
+	
+	return([smoothed_x, smoothed_y])
 	
 def _getThresholdMask(image_in):
 	image_arr = np.array(image_in)
