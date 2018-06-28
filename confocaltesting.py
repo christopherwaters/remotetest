@@ -17,9 +17,11 @@ for im_num, im_slice in enumerate(test_list):
 	print('Edges Traced')
 	endo_path, epi_path, labelled_arr = confocalhelper.splitImageObjects(skeleton_image)
 	print('Split Endo / Epi')
-	endo_traces[im_num] = np.array(confocalhelper.smoothPathTrace(endo_path)).swapaxes(0, 1)
+	endo_traces[im_num] = confocalhelper.orderPathTrace(endo_path)
+	#endo_traces[im_num] = np.array(confocalhelper.smoothPathTrace(endo_path)).swapaxes(0, 1)
 	print('Endo Smoothed')
-	epi_traces[im_num] = np.array(confocalhelper.smoothPathTrace(epi_path)).swapaxes(0, 1)
+	epi_traces[im_num] = confocalhelper.orderPathTrace(epi_path)
+	#epi_traces[im_num] = np.array(confocalhelper.smoothPathTrace(epi_path)).swapaxes(0, 1)
 	print('Epi Smoothed')
 
 slice_gaps = [i*slice_gap for i in range(len(endo_traces))]

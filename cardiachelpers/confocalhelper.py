@@ -9,6 +9,7 @@ from skimage import io
 import skimage.filters
 import skimage.measure
 import skimage.morphology
+import skimage.feature
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import os.path
@@ -274,25 +275,41 @@ def openModelImage(image_file):
 	return(im_list)
 
 def skeletonizeImage(input_image):
+	"""Create a 1-pixel-wide trace of a larger thicker path.
+	"""
+	# Convert to binary image and skeletonize
 	binary_array = np.array(input_image) > 0
 	skeleton_contour = skimage.morphology.skeletonize(binary_array)
 	return(skeleton_contour)
 	
 def contourMaskImage(mask_image):
-	edge_contour = skimage.filters.scharr (mask_image)
-	skeleton_contour = skeletonizeImage(edge_contour)
-	return(skeleton_contour)
+	"""Using a foreground mask image, create a trace of the boundaries where foreground and background meet.
+	"""
+	edge_contour = skimage.feature.canny(np.array(mask_image), sigma=2)
+	return(edge_contour)
 	
 def splitImageObjects(binary_arr):
+	"""Get the connected objects from an image, and gather the two large paths.
+	
+	Returns:
+		endo_path: The smaller of the two objects.
+		epi_path: The larger of the two objects.
+		labeled_arr: The input array, labeled with integer values indicating object connectivity.
+	"""
+	# Create the binary structure to indicate connectivity in corners and edges
 	connecting_mat = scipy.ndimage.generate_binary_structure(2, 2)
+	# Label the array for object connectivity, get the first two objects
 	labeled_arr, num_features = scipy.ndimage.label(binary_arr, structure=connecting_mat)
 	path_1 = np.array(np.where(labeled_arr == 1)).swapaxes(0, 1)
 	path_2 = np.array(np.where(labeled_arr == 2)).swapaxes(0, 1)
+	# Set endo and epi paths based on path size (epi is larger)
 	endo_path = path_1 if path_1.size < path_2.size else path_2
 	epi_path = path_1 if path_1.size > path_2.size else path_2
 	return(endo_path, epi_path, labeled_arr)
 
 def smoothPathTrace(pt_path):
+	"""Attempt to interpolate the points around the path to form a smoother path trace.
+	"""
 	center_pt = np.mean(pt_path, axis=0)
 	shifted_path = np.array([pt_path[i, :] - center_pt for i in range(pt_path.shape[0])])
 	
@@ -313,6 +330,17 @@ def smoothPathTrace(pt_path):
 	smoothed_y = np.append(smoothed_y, smoothed_y[0])
 	
 	return([smoothed_x, smoothed_y])
+	
+def orderPathTrace(pt_path):
+	center_pt = np.mean(pt_path, axis=0)
+	shifted_path = np.array([pt_path[i, :] - center_pt for i in range(pt_path.shape[0])])
+	
+	path_theta, path_rho = mathhelper.cart2pol(shifted_path[:, 0], shifted_path[:, 1])
+	
+	path_pt_order = np.argsort(path_theta, kind='mergesort')
+	
+	pt_path_ordered = pt_path[path_pt_order, :]
+	return(pt_path_ordered)
 	
 def _getThresholdMask(image_in):
 	image_arr = np.array(image_in)
