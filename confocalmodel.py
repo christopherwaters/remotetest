@@ -26,7 +26,7 @@ class ConfocalModel():
 	"""Model class to hold confocal microscopy images and format them to generate a mesh to align with MRI data.
 	"""
 
-	def __init__(self, top_dir):
+	def __init__(self, top_dir, slice_gap = 10):
 		"""Initialize the model made to import confocal microscopy data.
 		
 		args:
@@ -38,6 +38,10 @@ class ConfocalModel():
 		self.top_dir = top_dir
 		self.slices = [ConfocalSlice(im_dir) for im_dir in dirs]
 		self.slice_names = [confocal_slice.slice_name for confocal_slice in self.slices]
+		self.model_image = None
+		self.slice_image_list = None
+		self.endo_contours = None
+		self.epi_contours = None
 	
 	def generateStitchedImages(self, slices, sub_slices, overlap=0.1, compress_ratio=0.25, force_file=False):
 		"""Adjust image intensity based on edge intensity of adacent images.
@@ -62,7 +66,20 @@ class ConfocalModel():
 		"""Gather information about which channels are present within each image.
 		"""
 		return(list(self.slices[top_slice].channels))
-		
+	
+	def importModelImage(self, model_image_file):
+		self.model_image = model_image_file
+		self.slice_image_list = confocalhelper.openModelImage(model_image_file)
+	
+	def generateContours(self):
+		self.endo_contours = [None]*len(self.slice_image_list)
+		self.epi_contours = [None]*len(self.slice_image_list)
+		for im_num, im_slice in enumerate(self.slice_image_list):
+			edge_image = confocalhelper.contourMaskImage(im_slice)
+			endo_path, epi_path, labelled_arr = confocalhelper.splitImageObjects(edge_image)
+			self.endo_contours[im_num] = confocalhelper.orderPathTrace(endo_path)
+			self.epi_contours[im_num] = confocalhelper.orderPathTrace(epi_path)
+	
 class ConfocalSlice():
 	"""Class to hold information for a single biological slice of tissue.
 	

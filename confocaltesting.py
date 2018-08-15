@@ -3,29 +3,42 @@ import numpy as np
 import matplotlib.pyplot as mplt
 from mpl_toolkits.mplot3d import Axes3D
 
-test_tif = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/fake_confocal_stack.tif'
+test_tif = 'H:\ConfocalImages\DHETrialExport-062218\Slice3Contour.tif'
 
 test_list = confocalhelper.openModelImage(test_tif)
+
+if not isinstance(test_list, list):
+	test_list = [test_list]
 
 endo_traces = [None]*len(test_list)
 epi_traces = [None]*len(test_list)
 slice_gap = 10
 
 for im_num, im_slice in enumerate(test_list):
-	print(im_num)
 	skeleton_image = confocalhelper.contourMaskImage(im_slice)
-	print('Edges Traced')
 	endo_path, epi_path, labelled_arr = confocalhelper.splitImageObjects(skeleton_image)
-	print('Split Endo / Epi')
 	endo_traces[im_num] = confocalhelper.orderPathTrace(endo_path)
-	#endo_traces[im_num] = np.array(confocalhelper.smoothPathTrace(endo_path)).swapaxes(0, 1)
-	print('Endo Smoothed')
 	epi_traces[im_num] = confocalhelper.orderPathTrace(epi_path)
-	#epi_traces[im_num] = np.array(confocalhelper.smoothPathTrace(epi_path)).swapaxes(0, 1)
-	print('Epi Smoothed')
 
 slice_gaps = [i*slice_gap for i in range(len(endo_traces))]
-	
+
+endo_x, endo_y = confocalhelper.formatContourForModel(endo_traces)
+epi_x, epi_y = confocalhelper.formatContourForModel(epi_traces)
+
+avg_endo_x = np.nanmean(endo_x)
+avg_endo_y = np.nanmean(endo_y)
+
+for i in range(len(endo_traces)):
+	endo_traces[i][:, 0] = np.subtract(endo_traces[i][:, 0], avg_endo_x)
+	endo_traces[i][:, 1] = np.subtract(endo_traces[i][:, 1], avg_endo_y)
+	epi_traces[i][:, 0] = np.subtract(epi_traces[i][:, 0], avg_endo_x)
+	epi_traces[i][:, 1] = np.subtract(epi_traces[i][:, 1], avg_endo_y)
+
+endo_x -= avg_endo_x
+epi_x -= avg_endo_x
+endo_y -= avg_endo_y
+epi_y -= avg_endo_y
+
 fig = mplt.figure()
 ax = fig.add_subplot(111, projection='3d')
 

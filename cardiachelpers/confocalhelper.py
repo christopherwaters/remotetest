@@ -342,6 +342,18 @@ def orderPathTrace(pt_path):
 	pt_path_ordered = pt_path[path_pt_order, :]
 	return(pt_path_ordered)
 	
+def formatContourForModel(pt_list):
+	num_slices = len(pt_list)
+	max_path_length = max([pt_arr.shape[0] for pt_arr in pt_list])
+	path_x = np.full([1, num_slices, max_path_length], np.nan)
+	path_y = np.full([1, num_slices, max_path_length], np.nan)
+	for slice_num in range(num_slices):
+		pt_arr = pt_list[slice_num]
+		for pt_ind in range(pt_arr.shape[0]):
+			path_x[0, slice_num, pt_ind] = pt_arr[pt_ind, 0]
+			path_y[0, slice_num, pt_ind] = pt_arr[pt_ind, 1]
+	return(path_x, path_y)
+	
 def _getThresholdMask(image_in):
 	image_arr = np.array(image_in)
 	

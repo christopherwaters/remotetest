@@ -477,31 +477,63 @@ class modelGUI(tk.Frame):
 	def _createSubsliceWindow(self, slice_list, subslice_list, channel_list):
 		"""Create a window to select subslices and channels.
 		"""
+		# Calculate window height
+		root = tk.Tk()
+		screen_height = root.winfo_screenheight()
+		root.destroy()
+		
 		self.slice_menu = tk.Toplevel(self.master)
 		self.slice_menu.wm_title('Select Subslices and Channels')
+		
+		# Set up canvas to allow scrollable window
+		slice_canvas = tk.Canvas(self.slice_menu, borderwidth=0)
+		slice_frame = tk.Frame(slice_canvas)
+		scroll_bar = tk.Scrollbar(self.slice_menu, orient="vertical", command=slice_canvas.yview)
+		slice_canvas.configure(yscrollcommand=scroll_bar.set)
+		
+		scroll_bar.pack(side="right", fill="y")
+		slice_canvas.pack(side="left", fill="both", expand=True)
+		slice_canvas.create_window((4,4), window=slice_frame, anchor="nw")
+		
+		def onFrameConfigure(canvas):
+			canvas.configure(scrollregion=canvas.bbox("all"))
+		
+		slice_canvas.bind_all("<MouseWheel>", lambda event: slice_canvas.yview_scroll(int(-1*(event.delta/40)), "units"))
+		slice_frame.bind("<Configure>", lambda event, canvas=slice_canvas: onFrameConfigure(slice_canvas))
 		
 		self.subslice_selections = {}
 		
 		for slice_num, slice_index in enumerate(slice_list):
-			self.slice_menu.columnconfigure(slice_num, pad=10)
-			ttk.Label(self.slice_menu, text=self.confocal_model.slice_names[slice_index]).grid(row=0, column=slice_num)
+			slice_frame.columnconfigure(slice_num, pad=10)
+			ttk.Label(slice_frame, text=self.confocal_model.slice_names[slice_index]).grid(row=0, column=slice_num)
 			for sub_num, sub_slice in enumerate(subslice_list[slice_num]):
 				cur_string = self.confocal_model.slice_names[slice_index] + " Frame " + str(sub_slice)
 				self.subslice_selections[cur_string] = tk.IntVar(value=1)
-				ttk.Checkbutton(self.slice_menu, text="Frame " + str(sub_slice), variable=self.subslice_selections[cur_string]).grid(row=sub_num+1, column=slice_num)
+				ttk.Checkbutton(slice_frame, text="Frame " + str(sub_slice), variable=self.subslice_selections[cur_string]).grid(row=sub_num+1, column=slice_num)
 		
 		self.channel_selections = {}
-		farthest_column, lowest_row = self.slice_menu.grid_size()
+		farthest_column, lowest_row = slice_frame.grid_size()
 		# Place Channel List
 		for slice_num, slice_index in enumerate(slice_list):
-			ttk.Label(self.slice_menu, text='Channels').grid(row=lowest_row, column=slice_num)
+			ttk.Label(slice_frame, text='Channels').grid(row=lowest_row, column=slice_num)
 			for channel_num, channel in enumerate(channel_list[slice_num]):
 				cur_string = self.confocal_model.slice_names[slice_index] + ' ' + channel
 				self.channel_selections[cur_string] = tk.IntVar(value=1)
-				ttk.Checkbutton(self.slice_menu, text=channel, variable=self.channel_selections[cur_string]).grid(row=lowest_row+channel_num+1, column=slice_num)
+				ttk.Checkbutton(slice_frame, text=channel, variable=self.channel_selections[cur_string]).grid(row=lowest_row+channel_num+1, column=slice_num)
 				
-		farthest_column, lowest_row = self.slice_menu.grid_size()
-		ttk.Button(self.slice_menu, text='Generate Stitched Image', command= lambda: self._stitchSlices(slice_list)).grid(row=lowest_row, column=math.ceil(farthest_column/2)-1, columnspan=2-(farthest_column % 2))
+		farthest_column, lowest_row = slice_frame.grid_size()
+		ttk.Button(slice_frame, text='Generate Stitched Image', command= lambda: self._stitchSlices(slice_list)).grid(row=lowest_row, column=math.ceil(farthest_column/2)-1, columnspan=2-(farthest_column % 2))
+		
+		# Update and resize the canvas to match the frame
+		slice_frame.update()
+		slice_canvas.update()
+		
+		frame_height = np.min([int(screen_height * 3 / 4), slice_frame.winfo_height()])
+		
+		slice_canvas.config(width = slice_frame.winfo_width(), height=frame_height)
+		
+		#self.slice_menu.update()
+		#print(frame_height)
 		
 	def _stitchSlices(self, slice_list):
 		"""Actually iterate through and run the stitching process for each item selected by the user.
