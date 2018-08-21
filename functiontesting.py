@@ -5,12 +5,34 @@ import numpy as np
 import warnings
 from cardiachelpers import displayhelper
 
+mesh_filename = 'C:/Users/cdw2be/Downloads/Code4Chris/data/LVGEOM_8x4_noshift.mat'
 sa_filename = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-Chris-PinPts.mat'
 la_filename = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-LAPinPts.mat'
 lge_filename = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-Scar.mat'
+
+num_rings = 28
+elem_per_ring = 50
+elem_in_wall = 5
+mesh_type = '4x8'
+time_point = 0
+
+
+mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
+mri_mesh.importPremadeMesh(mesh_filename)
+
+'''
+mri_model = mrimodel.MRIModel(sa_filename, la_filename, scar_file=lge_filename)
+mri_model.importCine(timepoint=0)
+mri_mesh.fitContours(mri_model.cine_endo[time_point], mri_model.cine_epi[time_point], mri_model.cine_apex_pt, mri_model.cine_basal_pt, mri_model.cine_septal_pts, mesh_type)
+mri_mesh.feMeshRender()
+mri_mesh.nodeNum(mri_mesh.meshCart[0], mri_mesh.meshCart[1], mri_mesh.meshCart[2])
+mri_mesh.getElemConMatrix()
+'''
+# Splitting
+'''
 dense_filenames = ['C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-DENSE-Z5_4.mat', 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-DENSE-Z6_4.mat']
 
-mri_model = mrimodel.MRIModel(sa_filename, la_filename, scar_file=lge_filename, dense_file=dense_filenames)
+mri_model = mrimodel.MRIModel(sa_filename, la_filename, scar_file=lge_filename)
 mri_model.importCine(timepoint=0)
 mri_model.importLGE()
 with warnings.catch_warnings():
@@ -20,13 +42,7 @@ with warnings.catch_warnings():
 mri_model.importDense()
 mri_model.alignDense(cine_timepoint=0)
 
-num_rings = 14
-elem_per_ring = 25
-elem_in_wall = 5
-mesh_type = '4x2'
-time_point = 0
 
-mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
 mri_mesh.fitContours(mri_model.cine_endo[time_point], mri_model.cine_epi[time_point], mri_model.cine_apex_pt, mri_model.cine_basal_pt, mri_model.cine_septal_pts, mesh_type)
 mri_mesh.feMeshRender()
 mri_mesh.nodeNum(mri_mesh.meshCart[0], mri_mesh.meshCart[1], mri_mesh.meshCart[2])
@@ -42,3 +58,4 @@ mesh_axes = displayhelper.surfaceRender(mri_mesh.epi_node_matrix, mri_mesh.focus
 dense_nodes = np.unique(mri_mesh.hex[dense_elems, :])
 
 mesh_axes = displayhelper.nodeRender(mri_mesh.nodes[dense_nodes, :], mesh_axes)
+'''
