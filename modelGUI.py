@@ -532,9 +532,6 @@ class modelGUI(tk.Frame):
 		
 		slice_canvas.config(width = slice_frame.winfo_width(), height=frame_height)
 		
-		#self.slice_menu.update()
-		#print(frame_height)
-		
 	def _stitchSlices(self, slice_list):
 		"""Actually iterate through and run the stitching process for each item selected by the user.
 		"""
