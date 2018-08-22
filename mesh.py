@@ -74,14 +74,14 @@ class Mesh():
 		"""A modified version of the mesh to allow importing premade mesh structures.
 		"""
 		lv_geom = importhelper.loadmat(mesh_file)['LVGEOM']
-		self.hex = np.array(lv_geom['eHEX'])
-		self.pent = np.array(lv_geom['ePENT'])
+		self.hex = np.subtract(np.array(lv_geom['eHEX']), 1)
+		self.pent = np.subtract(np.array(lv_geom['ePENT']), 1)
 		self.nodes = np.array(lv_geom['nXYZ'])
 		self.focus = lv_geom['focus']
 		self.num_rings, self.elem_per_ring, self.elem_in_wall = lv_geom['LVLCR']
-		epi_node_list = lv_geom['eEPI']
-		epi_index = [epi_node - 1 for epi_node in epi_node_list]
-		self.epi_nodes = self.hex[epi_index, :][:, [2, 3, 6, 7]]
+		epi_node_list = np.subtract(lv_geom['eEPI'], 1)
+		#epi_index = [epi_node - 1 for epi_node in epi_node_list]
+		self.epi_nodes = self.hex[epi_node_list, :][:, [2, 3, 6, 7]]
 	
 	def fitContours(self, all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, mesh_type):
 		"""Function to Perform the Contour Fitting from the Passed Endo and Epi Contour data.

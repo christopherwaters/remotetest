@@ -8,8 +8,8 @@ from cardiachelpers import displayhelper
 mesh_filename = 'C:/Users/cdw2be/Downloads/Code4Chris/data/LVGEOM_8x4_noshift.mat'
 feb_filename = 'C:/Users/cdw2be/Downloads/Code4Chris/data/temp_feb.feb'
 
-num_rings = 28
-elem_per_ring = 50
+num_rings = 24
+elem_per_ring = 48
 elem_in_wall = 5
 mesh_type = '4x8'
 time_point = 0
