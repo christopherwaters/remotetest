@@ -449,7 +449,7 @@ class Mesh():
 			else:
 				return(elem_data_arr)
 	
-	def generateFEFile(self, input_file, conn_mat='hex'):
+	def generateFEFile(self, file_name, conn_mat='hex'):
 		"""Generate FEBio output file for use in FEBio and PostView.
 		"""
 		# XML Version String
@@ -490,7 +490,7 @@ class Mesh():
 		elem_strings_formatted = [elem_str.format(*tuple(np.insert(conn_mat_nodes[i, :] + 1, 0, i+1))) for i in range(conn_mat_nodes.shape[0])]
 		
 		# Create file
-		output_file_name = input_file.replace('.mat', '.feb')
+		output_file_name = file_name.replace('.mat', '.feb')
 		with open(output_file_name, 'w') as out_file:
 			out_file.writelines([xml_ver_str, fe_start_str, module_str, geometry_start_str, node_start_str])
 			out_file.writelines(node_strings_formatted)

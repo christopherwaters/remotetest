@@ -6,9 +6,7 @@ import warnings
 from cardiachelpers import displayhelper
 
 mesh_filename = 'C:/Users/cdw2be/Downloads/Code4Chris/data/LVGEOM_8x4_noshift.mat'
-sa_filename = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-Chris-PinPts.mat'
-la_filename = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-LAPinPts.mat'
-lge_filename = 'C:/Users/cdw2be/Documents/pythoncardiacmodel/Test Data/E67-D28-Scar.mat'
+feb_filename = 'C:/Users/cdw2be/Downloads/Code4Chris/data/temp_feb.feb'
 
 num_rings = 28
 elem_per_ring = 50
@@ -16,9 +14,10 @@ elem_in_wall = 5
 mesh_type = '4x8'
 time_point = 0
 
-
 mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
 mri_mesh.importPremadeMesh(mesh_filename)
+mri_mesh.generateFEFile(feb_filename)
+displayhelper.displayMeshPostview(feb_filename)
 
 '''
 mri_model = mrimodel.MRIModel(sa_filename, la_filename, scar_file=lge_filename)
