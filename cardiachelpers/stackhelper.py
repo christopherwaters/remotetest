@@ -173,7 +173,7 @@ def transformStack(setstruct, slice_number=0, layer='endo'):
 			interp_xy_pts = interp_func(interp_perim_pts)
 			# Store the interpolated xy points, minus the last value (repeated from first)
 			xy_pts[i] = np.array(interp_xy_pts[0:interp_xy_pts.shape[0]-1,:])
-	# Pull values from the setstruct dict
+	'''# Pull values from the setstruct dict
 	x_resolution = setstruct['ResolutionX']
 	y_resolution = setstruct['ResolutionY']
 	image_position = setstruct['ImagePosition']
@@ -183,7 +183,7 @@ def transformStack(setstruct, slice_number=0, layer='endo'):
 	y_image_orientation = image_orientation[0:3]
 	z_image_orientation = np.cross(y_image_orientation, x_image_orientation)
 	slice_thickness = setstruct['SliceThickness']
-	slice_gap = setstruct['SliceGap']
+	slice_gap = setstruct['SliceGap']'''
 	# Set the z offset (always 0 in long-axis)
 	if layer == 'long':
 		z_offset = 0
@@ -199,7 +199,7 @@ def transformStack(setstruct, slice_number=0, layer='endo'):
 				z_pix = z_pix.reshape([z_pix.shape[0], 1])
 				xyz_pts[i] = np.append(xyz_pts[i], z_pix, axis=1)
 				xyz_shape = xyz_pts[i].shape
-	# Set t_o as a 4x4 identity matrix except the final column is [-1, -1, 0, 1]
+	'''# Set t_o as a 4x4 identity matrix except the final column is [-1, -1, 0, 1]
 	t_o = np.identity(4)
 	t_o[:,3] = [-1, -1, 0, 1]
 	# Set s_eye as an identity matrix except the first 3 points on the diagonal are:
@@ -215,7 +215,8 @@ def transformStack(setstruct, slice_number=0, layer='endo'):
 	t_ipp = np.identity(4)
 	t_ipp[0:3,3] = image_position
 	# Multiply t_ipp, r_eye, s_eye, and t_o and store as m_arr
-	m_arr = t_ipp@r_eye@s_eye@t_o
+	m_arr = t_ipp@r_eye@s_eye@t_o'''
+	m_arr = _generateTransformMatrix(setstruct)
 	if run_xyz:
 		for i in range(x_pix_round.shape[0]):
 			# As long as there are no NaN values:
@@ -664,3 +665,33 @@ def shiftPolarCartesian(endo_polar, epi_polar, endo, epi, kept_slices, axis_cent
 	new_cine_epi = temp_cine_epi.reshape([temp_cine_epi.shape[0]*temp_cine_epi.shape[1], temp_cine_epi.shape[2]])
 
 	return([new_cine_endo, new_cine_epi])
+	
+def _generateTransformMatrix(setstruct):
+	# Pull values from the setstruct dict
+	x_resolution = setstruct['ResolutionX']
+	y_resolution = setstruct['ResolutionY']
+	image_position = setstruct['ImagePosition']
+	image_orientation = setstruct['ImageOrientation']
+	# Pull the image orientation in x and y, then the z is the cross-product
+	x_image_orientation = image_orientation[3:6]
+	y_image_orientation = image_orientation[0:3]
+	z_image_orientation = np.cross(y_image_orientation, x_image_orientation)
+	slice_thickness = setstruct['SliceThickness']
+	slice_gap = setstruct['SliceGap']
+	t_o = np.identity(4)
+	t_o[:,3] = [-1, -1, 0, 1]
+	# Set s_eye as an identity matrix except the first 3 points on the diagonal are:
+	#		x_resolution, y_resolution, slice_thickness+slice_gap
+	s_eye = np.identity(4)
+	s_eye[0,0] = x_resolution
+	s_eye[1,1] = y_resolution
+	s_eye[2,2] = slice_thickness + slice_gap
+	# Set r_eye as a 4x4 identity matrix except the upper right corner is a 3x3 transposed orientation matrix
+	r_eye = np.identity(4)
+	r_eye[0:3,0:3] = np.transpose([x_image_orientation[:], y_image_orientation[:], z_image_orientation[:]])
+	# Set t_ipp to an identity matrix except the first 3 points of the final column are the image position
+	t_ipp = np.identity(4)
+	t_ipp[0:3,3] = image_position
+	# Multiply t_ipp, r_eye, s_eye, and t_o and store as m_arr
+	m_arr = t_ipp@r_eye@s_eye@t_o
+	return(m_arr)

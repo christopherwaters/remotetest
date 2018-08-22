@@ -44,7 +44,7 @@ class MRIModel():
 		aligned_scar (array): The scar contour mapped from LGE to cine stack
 	"""
 	
-	def __init__(self, cine_file, la_file, scar_file=None, dense_file=None):
+	def __init__(self, cine_file, la_file, sa_scar_file=None, la_scar_files=None, dense_file=None):
 		"""Initialize new MRI model and select applicable files.
 		
 		Args:
@@ -55,11 +55,17 @@ class MRIModel():
 		"""
 		self.cine_file = cine_file
 		self.long_axis_file = la_file
-		if scar_file:
-			self.scar_file = scar_file
+		if sa_scar_file:
+			self.sa_scar_file = sa_scar_file
 			self.scar = True
+			if la_scar_files:
+				self.la_scar_files = la_scar_files
+				self.la_scar = True
+			else:
+				self.la_scar_files = None
+				self.la_scar = False
 		else:
-			self.scar_file = None
+			self.sa_scar_file = None
 			self.scar = False
 		
 		if dense_file:
@@ -148,7 +154,7 @@ class MRIModel():
 			wall_thickness_alltime[i] = wall_thickness
 		
 			# Retranslate results to cartesian from polar and shift:
-			cine_endo, cine_epi = stackhelper.shiftPolarCartesian(endo_polar, epi_polar, endo_by_timept[1], epi_by_timept[1], kept_slices, axis_center, wall_thickness)
+			cine_endo, cine_epi = stackhelper.shiftPolarCartesian(endo_polar, epi_polar, endo_by_timept[i], epi_by_timept[i], kept_slices, axis_center, wall_thickness)
 			cine_endo_alltime[i] = cine_endo
 			cine_epi_alltime[i] = cine_epi
 		
@@ -172,7 +178,7 @@ class MRIModel():
 		Returns:
 			boolean: True if the import was successful.
 		"""
-		scar_endo_stack, scar_epi_stack, scar_insertion_pts, scarstruct, scar_septal_slice = importhelper.importStack(self.scar_file)
+		scar_endo_stack, scar_epi_stack, scar_insertion_pts, scarstruct, scar_septal_slice = importhelper.importStack(self.sa_scar_file)
 		
 		# Prepare variables imported from file.
 		scar_auto = np.array(scarstruct['Scar']['Auto'])

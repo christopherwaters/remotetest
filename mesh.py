@@ -80,7 +80,6 @@ class Mesh():
 		self.focus = lv_geom['focus']
 		self.num_rings, self.elem_per_ring, self.elem_in_wall = lv_geom['LVLCR']
 		epi_node_list = np.subtract(lv_geom['eEPI'], 1)
-		#epi_index = [epi_node - 1 for epi_node in epi_node_list]
 		self.epi_nodes = self.hex[epi_node_list, :][:, [2, 3, 6, 7]]
 	
 	def fitContours(self, all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, mesh_type):
@@ -462,13 +461,12 @@ class Mesh():
 		# Set up Module section strings
 		module_str = '\t<Module type="solid"/>\n'
 		
-		'''
 		# Set up Material section strings
-		material_start_str = '<Material>'
-		material_end_str = '</Material>'
-		material_child_str = '<material id="1" name="Material 1" type="trans iso Mooney-Rivlin">'
-		material_end_str = '</material>'
-		'''
+		material_start_str = '\t<Material>\n'
+		material_end_str = '\t</Material>\n'
+		material_child_str = '\t\t<material id="1" name="Material 1" type="trans iso Mooney-Rivlin">\n'
+		material_child_end_str = '\t\t</material>\n'
+
 		# Set up Geometry strings
 		geometry_start_str = '\t<Geometry>\n'
 		geometry_end_str = '\t</Geometry>\n'
@@ -492,7 +490,8 @@ class Mesh():
 		# Create file
 		output_file_name = file_name.replace('.mat', '.feb')
 		with open(output_file_name, 'w') as out_file:
-			out_file.writelines([xml_ver_str, fe_start_str, module_str, geometry_start_str, node_start_str])
+			out_file.writelines([xml_ver_str, fe_start_str, module_str, material_start_str, material_child_str, material_child_end_str])
+			out_file.writelines([material_end_str, geometry_start_str, node_start_str])
 			out_file.writelines(node_strings_formatted)
 			out_file.writelines([node_end_str, element_start_str])
 			out_file.writelines(elem_strings_formatted)

@@ -240,7 +240,7 @@ class modelGUI(tk.Frame):
 			dense_filenames_replaced = dense_filenames.get()
 		
 		# Instantiate MRI model object and import cine stack (at default timepoint)
-		self.mri_model = mrimodel.MRIModel(sa_filename.get(), la_filename.get(), scar_file=lge_filename.get(), dense_file=dense_filenames_replaced)
+		self.mri_model = mrimodel.MRIModel(sa_filename.get(), la_filename.get(), sa_scar_file=lge_filename.get(), dense_file=dense_filenames_replaced)
 		self.progLabel['text'] = 'Importing Cine Stack'
 		self.mri_model.importCine(timepoint=0)
 		
