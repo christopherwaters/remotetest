@@ -204,6 +204,19 @@ class MRIModel():
 		
 		return(True)
 		
+	def importScarLA(self):
+		"""Import Long-Axis LGE Images and contours.
+		"""
+		# Set up import variables based on number of long-axis files.
+		self.scar_la_endo = [None]*len(self.la_scar_files)
+		self.scar_la_epi = [None]*len(self.la_scar_files)
+		self.scar_la_pinpts = [None]*len(self.la_scar_files)
+		self.scar_la_struct = [None]*len(self.la_scar_files)
+		self.scar_septal_slice = [None]*len(self.la_scar_files)
+		
+		for i in range(len(self.la_scar_files)):
+			self.scar_la_endo[i], self.scar_la_epi[i], self.scar_la_pinpts[i], self.scar_la_struct[i], self.scar_septal_slice[i] = importhelper.importStack(self.la_scar_files[i])
+		
 	def importDense(self):
 		"""Imports DENSE MR data from the file established at initialization.
 		"""

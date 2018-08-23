@@ -134,6 +134,11 @@ def importStack(short_axis_file, timepoint=0):
 		epi_y = np.swapaxes(epi_y, 0, 1)
 		epi_y = np.swapaxes(epi_y, 2, 1)
 	else:
+		if endo_x.ndim < 2:
+			endo_x = np.expand_dims(endo_x, 1)
+			endo_y = np.expand_dims(endo_y, 1)
+			epi_x = np.expand_dims(epi_x, 1)
+			epi_y = np.expand_dims(epi_y, 1)
 		endo_x = endo_x.transpose()
 		endo_y = endo_y.transpose()
 		epi_x = epi_x.transpose()
