@@ -97,7 +97,7 @@ def importLongAxis(long_axis_file):
 	apex_base_pts, pinpts = stackhelper.transformStack(lastruct, layer='long')
 	return(apex_base_pts)
 	
-def importStack(short_axis_file, timepoint=0):
+def importStack(short_axis_file, timepoint=0, ignore_pinpts=False):
 	"""Imports the short-axis file and formats data from it.
 	
 	Data is imported using the custom loadmat function
@@ -152,10 +152,73 @@ def importStack(short_axis_file, timepoint=0):
 	# Process the setstruct to get time points and slices that were segmented
 	kept_slices, time_id = stackhelper.removeEmptySlices(setstruct, endo_x)
 	kept_slices = np.array(kept_slices)
+	if not ignore_pinpts:
+		setstruct, septal_slice = _findRVInsertionPts(setstruct, time_id, timepoint, endo_x, endo_y)
+		'''
+		time_id = np.squeeze(np.array(time_id))
+		endo_pin_x = np.array(setstruct['EndoPinX'])
+		endo_pin_y = np.array(setstruct['EndoPinY'])
+	
+		# If more than 1 timepoint is passed, use the indicated timepoint at call
+		if time_id.size > 1:
+			try:
+				time_id = np.where(endo_pin_x)[0][timepoint]
+			except(IndexError):
+				print('Invalid timepoint selected. Adjusting to initial timepoint.')
+				time_id = np.where(endo_pin_x)[0][0]
+	
+		# Ensure that the pinpoint arrays are the correct dimensionality    
+		if endo_pin_x.ndim == 1:
+			endo_pin_x = endo_pin_x.reshape(1, endo_pin_x.shape[0])
+		if endo_pin_y.ndim == 1:
+			endo_pin_y = endo_pin_y.reshape(1, endo_pin_y.shape[0])
+		
+		# Finds the slice where the pinpoints are placed and treats it as the septal slice
+		findRVSlice = lambda pin_x: np.where([np.sum(pin_x[:, cur_slice][0]) for cur_slice in range(pin_x.shape[1])])
+		septal_slice = findRVSlice(endo_pin_x)
+	
+		# Extract the x and y pinpoints for the current contour
+		x_pins = np.array(endo_pin_x[time_id, septal_slice][0][0])
+		y_pins = np.array(endo_pin_y[time_id, septal_slice][0][0])
+		endo_pins = np.array([x_pins, y_pins]).transpose()
+		
+		# Calculate the Septal Mid-Point from the pinpoints
+		sept_pt = mathhelper.findMidPt(endo_pins, time_id, septal_slice, endo_x, endo_y)
+
+		# Add the midpoint to the x and y pinpoint list and add it back to setstruct
+		#        This part requires somewhat complex list comprehensions to reduce clutter and due to the complexity of the data format
+		new_endo_pin_x = [np.append(cur_endo_pin_x, sept_pt[0]).tolist() if cur_endo_pin_x else cur_endo_pin_x for cur_endo_pin_x in endo_pin_x .flatten()]
+		new_endo_pin_y = [np.append(cur_endo_pin_y, sept_pt[1]).tolist() if cur_endo_pin_y else cur_endo_pin_y for cur_endo_pin_y in endo_pin_y.flatten()]
+		endo_pin_x = np.reshape(new_endo_pin_x, endo_pin_x.shape)
+		endo_pin_y = np.reshape(new_endo_pin_y, endo_pin_y.shape)
+	
+		# Store relevant variables in the setstruct dictionary for use downstream
+		setstruct['EndoPinX'] = endo_pin_x
+		setstruct['EndoPinY'] = endo_pin_y
+		'''
+	setstruct['KeptSlices'] = kept_slices
+	setstruct['endo_x'] = endo_x
+	setstruct['endo_y'] = endo_y
+	setstruct['epi_x'] = epi_x
+	setstruct['epi_y'] = epi_y
+	
+	# Rotate the endo and epi contours (and pinpoints with the endo contour)
+	cxyz_sa_endo, rv_insertion_pts, _, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='endo')
+	cxyz_sa_epi, _, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='epi')
+
+	# Define return list based on pinpoint running
+	return_list = [cxyz_sa_endo, cxyz_sa_epi, rv_insertion_pts, setstruct] if ignore_pinpts else [cxyz_sa_endo, cxyz_sa_epi, rv_insertion_pts, setstruct, septal_slice]
+	return(return_list)
+	
+def _findRVInsertionPts(setstruct, time_id, timepoint, endo_x, endo_y):
+	"""Calculate RV Insertion point location and calculates a midpoint, also determines the septal slice.
+	
+	This is intended as a helper function that simply allows separation between 
+	"""
 	time_id = np.squeeze(np.array(time_id))
 	endo_pin_x = np.array(setstruct['EndoPinX'])
 	endo_pin_y = np.array(setstruct['EndoPinY'])
-	
+
 	# If more than 1 timepoint is passed, use the indicated timepoint at call
 	if time_id.size > 1:
 		try:
@@ -163,17 +226,17 @@ def importStack(short_axis_file, timepoint=0):
 		except(IndexError):
 			print('Invalid timepoint selected. Adjusting to initial timepoint.')
 			time_id = np.where(endo_pin_x)[0][0]
-	
+
 	# Ensure that the pinpoint arrays are the correct dimensionality    
 	if endo_pin_x.ndim == 1:
 		endo_pin_x = endo_pin_x.reshape(1, endo_pin_x.shape[0])
 	if endo_pin_y.ndim == 1:
 		endo_pin_y = endo_pin_y.reshape(1, endo_pin_y.shape[0])
-		
+	
 	# Finds the slice where the pinpoints are placed and treats it as the septal slice
 	findRVSlice = lambda pin_x: np.where([np.sum(pin_x[:, cur_slice][0]) for cur_slice in range(pin_x.shape[1])])
 	septal_slice = findRVSlice(endo_pin_x)
-	
+
 	# Extract the x and y pinpoints for the current contour
 	x_pins = np.array(endo_pin_x[time_id, septal_slice][0][0])
 	y_pins = np.array(endo_pin_y[time_id, septal_slice][0][0])
@@ -188,18 +251,9 @@ def importStack(short_axis_file, timepoint=0):
 	new_endo_pin_y = [np.append(cur_endo_pin_y, sept_pt[1]).tolist() if cur_endo_pin_y else cur_endo_pin_y for cur_endo_pin_y in endo_pin_y.flatten()]
 	endo_pin_x = np.reshape(new_endo_pin_x, endo_pin_x.shape)
 	endo_pin_y = np.reshape(new_endo_pin_y, endo_pin_y.shape)
-	
+
 	# Store relevant variables in the setstruct dictionary for use downstream
 	setstruct['EndoPinX'] = endo_pin_x
 	setstruct['EndoPinY'] = endo_pin_y
-	setstruct['KeptSlices'] = kept_slices
-	setstruct['endo_x'] = endo_x
-	setstruct['endo_y'] = endo_y
-	setstruct['epi_x'] = epi_x
-	setstruct['epi_y'] = epi_y
 	
-	# Rotate the endo and epi contours (and pinpoints with the endo contour)
-	cxyz_sa_endo, rv_insertion_pts, _, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='endo')
-	cxyz_sa_epi, _, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='epi')
-
-	return([cxyz_sa_endo, cxyz_sa_epi, rv_insertion_pts, setstruct, septal_slice])
+	return(setstruct, septal_slice)
