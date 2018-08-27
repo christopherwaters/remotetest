@@ -113,11 +113,44 @@ class MRIModel():
 			boolean: True if import was successful.
 		"""
 		# Import the Black-Blood cine (short axis) stack
-		endo_stack, epi_stack, rv_insertion_pts, sastruct, septal_slice = importhelper.importStack(self.cine_file, timepoint)
+		endo_stack, epi_stack, self.rv_insertion_pts, sastruct, septal_slice = importhelper.importStack(self.cine_file, timepoint)
 		kept_slices = sastruct['KeptSlices']
+
+		apex_pt = self.apex_base_pts[0, :]
+		base_pt = self.apex_base_pts[1, :]
+		center_septal_pt = np.expand_dims(self.rv_insertion_pts[2, :], 0)
 		
+		endo = [None]*len(kept_slices)
+		epi = [None]*len(kept_slices)
+		time_pts = np.unique(endo_stack[:, 3])
+		
+		for i, slice_num in enumerate(kept_slices):
+			endo_by_slice = endo_stack[np.where(endo_stack[:, 4] == slice_num)[0], :4]
+			epi_by_slice = epi_stack[np.where(epi_stack[:, 4] == slice_num)[0], :4]
+			endo_slice_by_time = [None]*len(time_pts)
+			epi_slice_by_time = [None]*len(time_pts)
+			for j, time_pt in enumerate(time_pts):
+				endo_slice_by_time[j] = endo_by_slice[np.where(endo_by_slice[:, 3] == time_pt)[0], :3]
+				epi_slice_by_time[j] = epi_by_slice[np.where(epi_by_slice[:, 3] == time_pt)[0], :3]
+			endo[i] = endo_slice_by_time
+			epi[i] = epi_slice_by_time
+		
+		self.cine_endo = endo
+		self.cine_epi = epi
+		
+		self.cine_endo_rotate = [None]*len(self.cine_endo)
+		self.cine_epi_rotate = [None]*len(self.cine_epi)
+		
+		for slice_num in range(len(self.cine_endo_rotate)):
+			endo_rotate_timepts = [None]*len(self.cine_endo[slice_num])
+			epi_rotate_timepts = [None]*len(self.cine_epi[slice_num])
+			for time_pt in range(len(endo_rotate_timepts)):
+				endo_rotate_timepts[time_pt], epi_rotate_timepts[time_pt], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(endo[slice_num][time_pt], epi[slice_num][time_pt], apex_pt, base_pt, center_septal_pt)
+			self.cine_endo_rotate[slice_num] = endo_rotate_timepts
+			self.cine_epi_rotate[slice_num] = epi_rotate_timepts
 		# Get the adjusted contours from the stacks
-		abs_shifted, endo, epi, axis_center = stackhelper.getContourFromStack(endo_stack, epi_stack, sastruct, rv_insertion_pts, septal_slice, self.apex_base_pts)
+		'''
+		abs_shifted, endo, epi, axis_center = stackhelper.getContourFromStack(endo_stack, epi_stack, sastruct, self.rv_insertion_pts, septal_slice, self.apex_base_pts)
 		
 		# Sort endo and epi traces by timepoint
 		#	Pull time points from stack traces, then generate lists to store indices
@@ -157,14 +190,14 @@ class MRIModel():
 			cine_endo, cine_epi = stackhelper.shiftPolarCartesian(endo_polar, epi_polar, endo_by_timept[i], epi_by_timept[i], kept_slices, axis_center, wall_thickness)
 			cine_endo_alltime[i] = cine_endo
 			cine_epi_alltime[i] = cine_epi
-		
+		'''
 		# Store class fields based on calculated values:
-		self.cine_apex_pt = abs_shifted[0]
-		self.cine_basal_pt = abs_shifted[1]
-		self.cine_septal_pts = abs_shifted[2:]
-		self.cine_endo = cine_endo_alltime
-		self.cine_epi = cine_epi_alltime
-		self.cine_slices = kept_slices
+		#self.cine_apex_pt = abs_shifted[0]
+		#self.cine_basal_pt = abs_shifted[1]
+		#self.cine_septal_pts = abs_shifted[2:]
+		#self.cine_endo = cine_endo_alltime
+		#self.cine_epi = cine_epi_alltime
+		#self.cine_slices = kept_slices
 
 		return(True)
 		
@@ -189,7 +222,7 @@ class MRIModel():
 		
 		# The new array needs to have axes adjusted to align with the format (z, x, y) allowing list[n] to return a full slice
 		scar_combined = np.swapaxes(np.swapaxes(scar_combined, 1, 2), 0, 1)
-		
+		self.scar_combined = scar_combined
 		# Get the x-y values from the mask
 		scar_abs, scar_endo, scar_epi, scar_ratio, scar_slices = stackhelper.getMaskContour(scar_endo_stack, scar_epi_stack, scar_insertion_pts, scarstruct, scar_septal_slice, scar_combined, self.apex_base_pts)
 		
@@ -212,6 +245,8 @@ class MRIModel():
 		self.scar_la_epi = [None]*len(self.la_scar_files)
 		self.scar_la_pinpts = [None]*len(self.la_scar_files)
 		self.scar_la_struct = [None]*len(self.la_scar_files)
+		self.rot_scar_la_endo = [None]*len(self.la_scar_files)
+		self.rot_scar_la_epi = [None]*len(self.la_scar_files)
 		
 		for i in range(len(self.la_scar_files)):
 			self.scar_la_endo[i], self.scar_la_epi[i], self.scar_la_pinpts[i], self.scar_la_struct[i] = importhelper.importStack(self.la_scar_files[i], ignore_pinpts=True)
@@ -305,6 +340,18 @@ class MRIModel():
 		self.radial_strain = radial_strain
 		self.circumferential_strain = circumferential_strain
 		return(True)
+	
+	def alignScar(self, timepoint=0):
+		"""Scar alignment designed to include long-axis scar data.
+		"""
+		self.rot_scar_la_endo = [None]*len(self.la_scar_files)
+		self.rot_scar_la_epi = [None]*len(self.la_scar_files)
+		
+		apex_pt = self.apex_base_pts[0, :]
+		base_pt = self.apex_base_pts[1, :]
+		center_septal_pt = np.expand_dims(self.rv_insertion_pts[2, :], 0)
+		#for i in range(len(self.la_scar_files)):
+			#self.rot_scar_la_endo[i], self.rot_scar_la_epi[i], _, _, _ = stackhelper.rotateDataCoordinates(self.scar_la_endo[i], self.scar_la_epi[i], apex_pt, base_pt, center_septal_pt)
 	
 	def alignScarCine(self, timepoint=0):
 		"""A method of aligning scar and cine data

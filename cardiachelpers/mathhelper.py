@@ -101,7 +101,6 @@ def findMidPt(endo_pins, time_id, septal_slice, endo_x, endo_y):
 		endo_pins = np.expand_dims(endo_pins, 0)
 	# Get mean point between the 2 pinpoints.
 	mean_pt = np.mean(endo_pins, axis=0).reshape([2, 1])
-	print(mean_pt)
 	
 	# Calculate the perpindicular line between the two points (just slope, no intercept)
 	slope = (endo_pins[1,1] - endo_pins[0,1])/(endo_pins[1,0] - endo_pins[0,0])

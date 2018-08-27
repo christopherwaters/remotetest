@@ -94,7 +94,7 @@ def importLongAxis(long_axis_file):
 	# Pull the setstruct data from the global structure
 	lastruct = long_axis_data['setstruct']
 	# Get the apex and basal points from stack transformation
-	apex_base_pts, pinpts = stackhelper.transformStack(lastruct, layer='long')
+	apex_base_pts, m_arr = stackhelper.transformStack(lastruct, layer='long')
 	return(apex_base_pts)
 	
 def importStack(short_axis_file, timepoint=0, ignore_pinpts=False):
@@ -205,7 +205,7 @@ def importStack(short_axis_file, timepoint=0, ignore_pinpts=False):
 	# Rotate the endo and epi contours (and pinpoints with the endo contour)
 	cxyz_sa_endo, rv_insertion_pts, _, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='endo')
 	cxyz_sa_epi, _, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='epi')
-
+	
 	# Define return list based on pinpoint running
 	return_list = [cxyz_sa_endo, cxyz_sa_epi, rv_insertion_pts, setstruct] if ignore_pinpts else [cxyz_sa_endo, cxyz_sa_epi, rv_insertion_pts, setstruct, septal_slice]
 	return(return_list)

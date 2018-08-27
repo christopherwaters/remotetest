@@ -21,13 +21,13 @@ mri_mesh.generateFEFile(feb_filename)
 
 sa_filename = 'C:/Users/cdw2be/Downloads/Code4Chris/data/SA_LGE_Scar_Pnpts.mat'
 la_pinpt_filename = 'C:/Users/cdw2be/Downloads/Code4Chris/data/LA_LGE_2CH_Pnpts.mat'
-la_lge_filenames = ['C:/Users/cdw2be/Downloads/Code4Chris/data/LA_LGE_2CH_Scar.mat', 'C:/Users/cdw2be/Downloads/Code4Chris/data/LA_LGE_3CH_Scar.mat', 'C:/Users/cdw2be/Downloads/Code4Chris/data/LA_LGE_2CH_Scar.mat']
+la_lge_filenames = ['C:/Users/cdw2be/Downloads/Code4Chris/data/LA_LGE_2CH_Scar.mat', 'C:/Users/cdw2be/Downloads/Code4Chris/data/LA_LGE_3CH_Scar.mat', 'C:/Users/cdw2be/Downloads/Code4Chris/data/LA_LGE_4CH_Scar.mat']
 
 mri_model = mrimodel.MRIModel(sa_filename, la_pinpt_filename, sa_scar_file=sa_filename, la_scar_files=la_lge_filenames)
 mri_model.importCine()
 mri_model.importLGE()
-print('Import Long-Axis Scar')
 mri_model.importScarLA()
+mri_model.alignScar()
 
 '''
 mri_model = mrimodel.MRIModel(sa_filename, la_filename, scar_file=lge_filename)

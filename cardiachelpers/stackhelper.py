@@ -4,6 +4,61 @@ import scipy.stats as spstats
 import math
 import cardiachelpers.mathhelper as mathhelper
 
+def rotateDataCoordinates(endo, epi, apex_pt, basal_pt, septal_pts):
+	"""Reorganize endo and epi data for processing.
+	
+	args:
+		all_data_endo (array): Endo data from MRI model
+		all_data_epi (array): Epi data from MRI model
+		apex_pt (array): Apical point selected from long-axis data
+		basal_pt (array): Basal point selected from long-axis data
+		septal_pts (array): Septal points selected from short-axis data
+	returns:
+		data_endo (array): Modified endo contour
+		data_epi (array): Modified epi contour
+		focus (float): The focal point for prolate coordinates
+		transform_basis (array): Combined vector from the 3 calculated basis vectors
+		origin (array): Point indicating the origin point
+	"""
+	#endo = all_data_endo[:, 0:3]
+	#epi = all_data_epi[:, 0:3]
+	
+	calcNorm = lambda arr_in: np.sqrt(np.sum(np.square(arr_in)))
+	
+	# Calculate first basis vector, (Base - Apex)/Magnitude
+	c = apex_pt - basal_pt
+	c_norm = calcNorm(c)
+	e1_basis = [c1 / c_norm for c1 in c]
+	
+	# Calculate Origin Location
+	origin = basal_pt + c/3
+	
+	# Calculate Focus Length based on c_norm
+	focus = (2*c_norm/3)/(math.cosh(1))
+	endo_points = endo.shape[0]
+	epi_points = epi.shape[0]
+	
+	# Calculate Second basis vector using plane intersects, septal point, and e1
+	d1 = septal_pts[0, :] - origin
+	d2 = d1 - [np.dot(d1, e1_basis)*e1_elem for e1_elem in e1_basis]
+	e2_basis = d2 / calcNorm(d2)
+	
+	# Calculate third basis vector from the first 2 basis vectors
+	e3 = np.cross(e1_basis, e2_basis)
+	e3_basis = e3 / calcNorm(e3)
+	
+	# Set up transform basis from the 3 calculated basis vectors
+	transform_basis = np.array([e1_basis, e2_basis, e3_basis])
+	
+	# Set up the modified endo and epi contours
+	data_endo = np.dot((endo - np.array([origin for i in range(endo_points)])), np.transpose(transform_basis))
+	data_epi = np.dot((epi - np.array([origin for i in range(epi_points)])), np.transpose(transform_basis))
+	
+	# Append extra identifying data to the modified contours
+	#data_endo = np.append(data_endo, np.reshape(all_data_endo[:, 3], [all_data_endo.shape[0], 1]), axis=1)
+	#data_epi = np.append(data_epi, np.reshape(all_data_epi[:, 3], [all_data_epi.shape[0], 1]), axis=1)
+	return([data_endo, data_epi, focus, transform_basis, origin])
+
 def getContourFromStack(endo_stack, epi_stack, sastruct, rv_insertion_pts, septal_slice, apex_base_pts, scar_stack=np.empty([0])):
 	"""Using the stacks, construct the endo and epi contours in proper format, abs points, axis center, and (if passed) scar
 	
@@ -306,7 +361,6 @@ def prepTransformedStack(transformed_stack, time_indices, j = 0):
 		# If every element is NaN, skip this timepoint
 		if np.all(np.isnan(Xd_k)):
 			continue
-			
 		# Store the slice index as an appropriately-shaped array for appending
 		slice_indices = j*np.ones([Xd_k.shape[0], 1])
 		# Append arrays together

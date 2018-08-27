@@ -98,7 +98,7 @@ class Mesh():
 		"""
 		
 		# Set up variables
-		data_endo, data_epi, self.focus, self.transform, self.origin = meshhelper.prepData(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts)
+		data_endo, data_epi, self.focus, self.transform, self.origin = stackhelper.rotateDataCoordinates(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts)
 		
 		# Fit using a bicubic interpolation.
 		self.endo_node_matrix, _ = meshhelper.fitBicubicData(data_endo, self.focus, mesh_density=mesh_type)
