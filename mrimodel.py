@@ -145,7 +145,8 @@ class MRIModel():
 			endo_rotate_timepts = [None]*len(self.cine_endo[slice_num])
 			epi_rotate_timepts = [None]*len(self.cine_epi[slice_num])
 			for time_pt in range(len(endo_rotate_timepts)):
-				endo_rotate_timepts[time_pt], epi_rotate_timepts[time_pt], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(endo[slice_num][time_pt], epi[slice_num][time_pt], apex_pt, base_pt, center_septal_pt)
+				endo_rotate_timepts[time_pt], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(endo[slice_num][time_pt], apex_pt, base_pt, center_septal_pt)
+				epi_rotate_timepts[time_pt], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(epi[slice_num][time_pt], apex_pt, base_pt, center_septal_pt)
 			self.cine_endo_rotate[slice_num] = endo_rotate_timepts
 			self.cine_epi_rotate[slice_num] = epi_rotate_timepts
 		# Get the adjusted contours from the stacks
@@ -222,18 +223,50 @@ class MRIModel():
 		
 		# The new array needs to have axes adjusted to align with the format (z, x, y) allowing list[n] to return a full slice
 		scar_combined = np.swapaxes(np.swapaxes(scar_combined, 1, 2), 0, 1)
+		scar_slices = np.where([np.any(scar_combined[slice_num, :, :]) for slice_num in range(scar_combined.shape[0])])[0]
 		self.scar_combined = scar_combined
+		
+		scar_x, scar_y = stackhelper.getMaskXY(scar_combined, scarstruct)
+		
+		scarstruct['mask_x'] = scar_x
+		scarstruct['mask_y'] = scar_y
+		
+		scar_pt_stack, scar_m, _ = stackhelper.rotateStack(scarstruct, scar_slices+1, layer='mask')
+		
+		apex_pt = self.apex_base_pts[0, :]
+		base_pt = self.apex_base_pts[1, :]
+		center_septal_pt = np.expand_dims(scar_insertion_pts[2, :], 0)
+		
+		scar_endo = [None]*len(scar_slices)
+		scar_epi = [None]*len(scar_slices)
+		self.lge_endo_rotate = [None]*len(scar_endo)
+		self.lge_epi_rotate = [None]*len(scar_epi)
+		#time_pts = np.unique(scar_endo_stack[:, 3])
+		
+		for i, slice_num in enumerate(scar_slices):
+			scar_endo[i] = scar_endo_stack[np.where(scar_endo_stack[:, 4] == slice_num+1)[0], :3]
+			scar_epi[i] = scar_epi_stack[np.where(scar_epi_stack[:, 4] == slice_num+1)[0], :3]
+			self.lge_endo_rotate[i], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(scar_endo[i], apex_pt, base_pt, center_septal_pt)
+			self.lge_epi_rotate[i], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(scar_epi[i], apex_pt, base_pt, center_septal_pt)
+			#endo_slice_by_time = [None]*len(time_pts)
+			#epi_slice_by_time = [None]*len(time_pts)
+			#for j, time_pt in enumerate(time_pts):
+			#	endo_slice_by_time[j] = endo_by_slice[np.where(endo_by_slice[:, 3] == time_pt)[0], :3]
+			#	epi_slice_by_time[j] = epi_by_slice[np.where(epi_by_slice[:, 3] == time_pt)[0], :3]
+			#scar_endo[i] = endo_slice_by_time
+			#scar_epi[i] = epi_slice_by_time
+		
 		# Get the x-y values from the mask
-		scar_abs, scar_endo, scar_epi, scar_ratio, scar_slices = stackhelper.getMaskContour(scar_endo_stack, scar_epi_stack, scar_insertion_pts, scarstruct, scar_septal_slice, scar_combined, self.apex_base_pts)
+		#scar_abs, scar_endo, scar_epi, scar_ratio, scar_slices = stackhelper.getMaskContour(scar_endo_stack, scar_epi_stack, scar_insertion_pts, scarstruct, scar_septal_slice, scar_combined, self.apex_base_pts)
 		
 		# Store instance fields
-		self.lge_apex_pt = scar_abs[0]
-		self.lge_basal_pt = scar_abs[1]
-		self.lge_septal_pts = scar_abs[2:]
+		#self.lge_apex_pt = scar_abs[0]
+		#self.lge_basal_pt = scar_abs[1]
+		self.lge_septal_pts = scar_insertion_pts
 		self.lge_endo = scar_endo
 		self.lge_epi = scar_epi
 		self.scar_slices = scar_slices
-		self.scar_ratio = scar_ratio
+		#self.scar_ratio = scar_ratio
 		
 		return(True)
 		

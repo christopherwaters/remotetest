@@ -4,7 +4,7 @@ import scipy.stats as spstats
 import math
 import cardiachelpers.mathhelper as mathhelper
 
-def rotateDataCoordinates(endo, epi, apex_pt, basal_pt, septal_pts):
+def rotateDataCoordinates(points, apex_pt, basal_pt, septal_pts):
 	"""Reorganize endo and epi data for processing.
 	
 	args:
@@ -35,8 +35,8 @@ def rotateDataCoordinates(endo, epi, apex_pt, basal_pt, septal_pts):
 	
 	# Calculate Focus Length based on c_norm
 	focus = (2*c_norm/3)/(math.cosh(1))
-	endo_points = endo.shape[0]
-	epi_points = epi.shape[0]
+	num_points = points.shape[0]
+	#epi_points = epi.shape[0]
 	
 	# Calculate Second basis vector using plane intersects, septal point, and e1
 	d1 = septal_pts[0, :] - origin
@@ -51,13 +51,13 @@ def rotateDataCoordinates(endo, epi, apex_pt, basal_pt, septal_pts):
 	transform_basis = np.array([e1_basis, e2_basis, e3_basis])
 	
 	# Set up the modified endo and epi contours
-	data_endo = np.dot((endo - np.array([origin for i in range(endo_points)])), np.transpose(transform_basis))
-	data_epi = np.dot((epi - np.array([origin for i in range(epi_points)])), np.transpose(transform_basis))
+	rot_points = np.dot((points - np.array([origin for i in range(num_points)])), np.transpose(transform_basis))
+	#data_epi = np.dot((epi - np.array([origin for i in range(epi_points)])), np.transpose(transform_basis))
 	
 	# Append extra identifying data to the modified contours
 	#data_endo = np.append(data_endo, np.reshape(all_data_endo[:, 3], [all_data_endo.shape[0], 1]), axis=1)
 	#data_epi = np.append(data_epi, np.reshape(all_data_epi[:, 3], [all_data_epi.shape[0], 1]), axis=1)
-	return([data_endo, data_epi, focus, transform_basis, origin])
+	return([rot_points, focus, transform_basis, origin])
 
 def getContourFromStack(endo_stack, epi_stack, sastruct, rv_insertion_pts, septal_slice, apex_base_pts, scar_stack=np.empty([0])):
 	"""Using the stacks, construct the endo and epi contours in proper format, abs points, axis center, and (if passed) scar
@@ -170,9 +170,9 @@ def transformStack(setstruct, slice_number=0, layer='endo'):
 		y_pix = setstruct['epi_y'][:,slice_number,:]
 		run_xyz = True
 	elif layer == 'mask':
-		x_pix = setstruct['mask_x'][:,slice_number,:]
-		y_pix = setstruct['mask_y'][:,slice_number,:]
-		run_xyz = np.isnan(sum(sum(setstruct['mask_x'][:,slice_number,:]))) < 1
+		x_pix = setstruct['mask_x'][slice_number]
+		y_pix = setstruct['mask_y'][slice_number]
+		run_xyz = np.isnan(sum(sum(x_pix))) < 1
 	elif layer == 'long':
 		run_xyz = False
 	else:
@@ -181,6 +181,7 @@ def transformStack(setstruct, slice_number=0, layer='endo'):
 		y_pix = setstruct['endo_y'][:,slice_number,:]
 		run_xyz = True
 	# If endo, epi, or scar where there are no NaN values:
+	if not(layer == 'long'): print(x_pix.shape)
 	if run_xyz:
 		# Round the x_pix and y_pix arrays
 		x_pix_round = np.round(x_pix)
@@ -573,29 +574,31 @@ def getMaskXY(mask, maskstruct):
 	"""General form to get binary masks (such as scar data) as xy overlays.
 	"""
 	kept_slices = maskstruct['KeptSlices']
-	mask_max = max([sum(sum(mask[i])) for i in range(mask.shape[0])])
+	#mask_max = max([sum(sum(mask[i])) for i in range(mask.shape[0])])
 	mask_pts = np.array(np.where(mask)) + 1
 	mask_slices = np.array(list(set(mask_pts[0, :])))
 	mask_pts[0] -= 1
-	mask_x = np.zeros([1, mask.shape[0], mask_max])
-	mask_y = np.zeros([1, mask.shape[0], mask_max])
+	#mask_x = np.zeros([mask.shape[0], mask_max])
+	#mask_y = np.zeros([mask.shape[0], mask_max])
+	mask_x = [None]*mask.shape[0]
+	mask_y = [None]*mask.shape[0]
 	for i in mask_slices:
 		temp_x = mask_pts[1, np.where(mask_pts[0, :] == i-1)]
 		temp_y = mask_pts[2, np.where(mask_pts[0, :] == i-1)]
-		mask_x[0, i-1, 0:temp_x.size] = temp_x
-		mask_y[0, i-1, 0:temp_y.size] = temp_y
-	maskstruct['mask_x'] = mask_x
-	maskstruct['mask_y'] = mask_y
-	cxyz_mask, mask_m, _ = rotateStack(maskstruct, kept_slices, layer='mask')
-	for i in mask_slices:
+		mask_x[i-1] = temp_x
+		mask_y[i-1] = temp_y
+	#maskstruct['mask_x'] = mask_x
+	#maskstruct['mask_y'] = mask_y
+	#cxyz_mask, mask_m, _ = rotateStack(maskstruct, kept_slices, layer='mask')
+	'''for i in mask_slices:
 		cxyz_slice = cxyz_mask[np.where(cxyz_mask[:, 4] == i), :][0]
 		mode_val, mode_count = spstats.mode(cxyz_slice[:, 0:2])
 		max_mode = max(mode_count.squeeze())
 		if max_mode > 1:
 			mode_ind = np.argmax(mode_count.squeeze())
 			cur_mode = mode_val.squeeze()[mode_ind]
-			cxyz_mask = np.delete(cxyz_mask, np.where(cxyz_mask[:, mode_ind] == cur_mode), axis=0)
-	return([cxyz_mask, kept_slices, mask_slices])
+			cxyz_mask = np.delete(cxyz_mask, np.where(cxyz_mask[:, mode_ind] == cur_mode), axis=0)'''
+	return([mask_x, mask_y])
 
 def convertSlicesToPolar(slices, endo, epi, scar=None, scar_flag=False, num_bins = 50):
 	"""Convert an epicardial and endocardial contour (and scar data) from cartesian to polar coordinates
