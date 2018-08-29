@@ -149,6 +149,8 @@ class MRIModel():
 				epi_rotate_timepts[time_pt], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(epi[slice_num][time_pt], apex_pt, base_pt, center_septal_pt)
 			self.cine_endo_rotate[slice_num] = endo_rotate_timepts
 			self.cine_epi_rotate[slice_num] = epi_rotate_timepts
+		self.rv_insertion_pts_rot = stackhelper.rotateDataCoordinates(self.rv_insertion_pts, apex_pt, base_pt, center_septal_pt)[0]
+		self.abs_pts_rot = stackhelper.rotateDataCoordinates(self.apex_base_pts, apex_pt, base_pt, center_septal_pt)[0]
 		# Get the adjusted contours from the stacks
 		'''
 		abs_shifted, endo, epi, axis_center = stackhelper.getContourFromStack(endo_stack, epi_stack, sastruct, self.rv_insertion_pts, septal_slice, self.apex_base_pts)
@@ -226,16 +228,16 @@ class MRIModel():
 		scar_slices = np.where([np.any(scar_combined[slice_num, :, :]) for slice_num in range(scar_combined.shape[0])])[0]
 		self.scar_combined = scar_combined
 		
-		scar_x, scar_y = stackhelper.getMaskXY(scar_combined, scarstruct)
+		scar_x, scar_y = stackhelper.getMaskXY(scar_combined, scarstruct['KeptSlices'])
 		
 		scarstruct['mask_x'] = scar_x
 		scarstruct['mask_y'] = scar_y
 		
-		scar_pt_stack, scar_m, _ = stackhelper.rotateStack(scarstruct, scar_slices+1, layer='mask')
-		
+		scar_pt_stack, scar_m = stackhelper.rotateStack(scarstruct, scar_slices+1, layer='mask')
+
 		apex_pt = self.apex_base_pts[0, :]
 		base_pt = self.apex_base_pts[1, :]
-		center_septal_pt = np.expand_dims(scar_insertion_pts[2, :], 0)
+		center_septal_pt = np.expand_dims(self.rv_insertion_pts[2, :], 0)
 		
 		scar_endo = [None]*len(scar_slices)
 		scar_epi = [None]*len(scar_slices)
@@ -249,7 +251,7 @@ class MRIModel():
 			scar_endo[i] = scar_endo_stack[np.where(scar_endo_stack[:, 4] == slice_num+1)[0], :3]
 			scar_epi[i] = scar_epi_stack[np.where(scar_epi_stack[:, 4] == slice_num+1)[0], :3]
 			scar_pts[i] = scar_pt_stack[np.where(scar_pt_stack[:, 4] == slice_num+1)[0], :3]
-			self.lge_endo_rotate[i], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(scar_endo[i], apex_pt, base_pt, center_septal_pt)
+			self.lge_endo_rotate[i], _, self.transform_basis, self.origin = stackhelper.rotateDataCoordinates(scar_endo[i], apex_pt, base_pt, center_septal_pt)
 			self.lge_epi_rotate[i], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(scar_epi[i], apex_pt, base_pt, center_septal_pt)
 			self.lge_pts_rotate[i], _, _, _ = stackhelper.rotateDataCoordinates(scar_pts[i], apex_pt, base_pt, center_septal_pt)
 			#endo_slice_by_time = [None]*len(time_pts)
@@ -259,7 +261,7 @@ class MRIModel():
 			#	epi_slice_by_time[j] = epi_by_slice[np.where(epi_by_slice[:, 3] == time_pt)[0], :3]
 			#scar_endo[i] = endo_slice_by_time
 			#scar_epi[i] = epi_slice_by_time
-		
+
 		# Get the x-y values from the mask
 		#scar_abs, scar_endo, scar_epi, scar_ratio, scar_slices = stackhelper.getMaskContour(scar_endo_stack, scar_epi_stack, scar_insertion_pts, scarstruct, scar_septal_slice, scar_combined, self.apex_base_pts)
 		
@@ -278,15 +280,44 @@ class MRIModel():
 		"""Import Long-Axis LGE Images and contours.
 		"""
 		# Set up import variables based on number of long-axis files.
-		self.scar_la_endo = [None]*len(self.la_scar_files)
-		self.scar_la_epi = [None]*len(self.la_scar_files)
-		self.scar_la_pinpts = [None]*len(self.la_scar_files)
-		self.scar_la_struct = [None]*len(self.la_scar_files)
-		self.rot_scar_la_endo = [None]*len(self.la_scar_files)
-		self.rot_scar_la_epi = [None]*len(self.la_scar_files)
+		scar_la_endo = [None]*len(self.la_scar_files)
+		scar_la_epi = [None]*len(self.la_scar_files)
+		scar_la_pinpts = [None]*len(self.la_scar_files)
+		scar_la_struct = [None]*len(self.la_scar_files)
+		scar_pt_stack = [None]*len(self.la_scar_files)
+
+		for i, la_scar_file in enumerate(self.la_scar_files):
+			# Import the long-axis-based LGE information
+			scar_la_endo[i], scar_la_epi[i], scar_la_pinpts[i], scar_la_struct[i] = importhelper.importStack(la_scar_file, ignore_pinpts=True)
+			
+			# Define scar combination
+			scar_auto = np.array(scar_la_struct[i]['Scar']['Auto'])
+			scar_manual = np.array(scar_la_struct[i]['Scar']['Manual'])
+			scar_combined_full = np.expand_dims(np.add(scar_auto, scar_manual) > 0, axis=0)
+			
+			scar_x, scar_y = stackhelper.getMaskXY(scar_combined_full, [0])
+			
+			scar_la_struct[i]['mask_x'] = scar_x
+			scar_la_struct[i]['mask_y'] = scar_y
+			
+			scar_pt_stack[i], _ = stackhelper.rotateStack(scar_la_struct[i], [1], layer='mask')
 		
-		for i in range(len(self.la_scar_files)):
-			self.scar_la_endo[i], self.scar_la_epi[i], self.scar_la_pinpts[i], self.scar_la_struct[i] = importhelper.importStack(self.la_scar_files[i], ignore_pinpts=True)
+		self.lge_la_endo_rotate = [None]*len(self.la_scar_files)
+		self.lge_la_epi_rotate = [None]*len(self.la_scar_files)
+		self.lge_la_pts_rotate = [None]*len(self.la_scar_files)
+		
+		apex_pt = self.apex_base_pts[0, :]
+		base_pt = self.apex_base_pts[1, :]
+		center_septal_pt = np.expand_dims(self.rv_insertion_pts[2, :], 0)
+		
+		for slice_num in range(len(self.la_scar_files)):
+			scar_endo = scar_la_endo[slice_num][:, :3]
+			scar_epi = scar_la_epi[slice_num][:, :3]
+			scar_pts = scar_pt_stack[slice_num][:, :3]
+			
+			self.lge_la_endo_rotate[slice_num] = stackhelper.rotateDataCoordinates(scar_endo, apex_pt, base_pt, center_septal_pt)[0]
+			self.lge_la_epi_rotate[slice_num] = stackhelper.rotateDataCoordinates(scar_epi, apex_pt, base_pt, center_septal_pt)[0]
+			self.lge_la_pts_rotate[slice_num] = stackhelper.rotateDataCoordinates(scar_pts, apex_pt, base_pt, center_septal_pt)[0]
 		
 	def importDense(self):
 		"""Imports DENSE MR data from the file established at initialization.

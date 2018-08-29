@@ -414,8 +414,8 @@ def rotateStack(setstruct, slice_labels, layer='endo', axial_flag=False):
 	# Set up initial variables for future use.
 	slice_counter = 1
 	cxyz = np.array([])
-	heartrate = np.array([])
-	hr = setstruct['HeartRate']
+	#heartrate = np.array([])
+	#hr = setstruct['HeartRate']
 	
 	# Determine orientation of image and exit if it is correct
 	if axial_flag:
@@ -432,7 +432,7 @@ def rotateStack(setstruct, slice_labels, layer='endo', axial_flag=False):
 		cxyz_slice = prepTransformedStack(transformed_stack, time_indices, j)
 		cxyz = np.append(cxyz, cxyz_slice)
 		# Track heartrate during each slice acquisition
-		heartrate = np.append(heartrate, [hr, slice_counter])
+		#heartrate = np.append(heartrate, [hr, slice_counter])
 		# Update the slice counter (it can differ from slice_labels due to skipped slices)
 		slice_counter += 1
 		# Determine what values to return based on the layer selected.
@@ -445,9 +445,9 @@ def rotateStack(setstruct, slice_labels, layer='endo', axial_flag=False):
 	cxyz = cxyz.reshape([int(cxyz.size/5), 5])
 	# Set the returned data based on the layer
 	if layer == 'epi' or layer == 'mask':
-		returnList = [cxyz, m_arr, heartrate]
+		returnList = [cxyz, m_arr]
 	else:
-		returnList = [cxyz, Pd, m_arr, heartrate]
+		returnList = [cxyz, Pd, m_arr]
 	return(returnList)
 
 def getMaskContour(mask_endo_stack, mask_epi_stack, mask_insertion_pts, mask_struct, mask_septal_slice, mask, apex_base_pts, transmural_filter=0.1, interp_vals=True, elim_secondary=True):
@@ -571,10 +571,10 @@ def getMaskContour(mask_endo_stack, mask_epi_stack, mask_insertion_pts, mask_str
 	
 	return([mask_abs, mask_endo, mask_epi, mask_ratio, mask_slices])
 	
-def getMaskXY(mask, maskstruct):
+def getMaskXY(mask, kept_slices):
 	"""General form to get binary masks (such as scar data) as xy overlays.
 	"""
-	kept_slices = maskstruct['KeptSlices']
+	#kept_slices = maskstruct['KeptSlices']
 	#mask_max = max([sum(sum(mask[i])) for i in range(mask.shape[0])])
 	mask_pts = np.array(np.where(mask)) + 1
 	mask_slices = np.array(list(set(mask_pts[0, :])))

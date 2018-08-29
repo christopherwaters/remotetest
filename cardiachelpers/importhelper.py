@@ -203,8 +203,8 @@ def importStack(short_axis_file, timepoint=0, ignore_pinpts=False):
 	setstruct['epi_y'] = epi_y
 	
 	# Rotate the endo and epi contours (and pinpoints with the endo contour)
-	cxyz_sa_endo, rv_insertion_pts, _, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='endo')
-	cxyz_sa_epi, _, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='epi')
+	cxyz_sa_endo, rv_insertion_pts, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='endo')
+	cxyz_sa_epi, _ = stackhelper.rotateStack(setstruct, kept_slices, layer='epi')
 	
 	# Define return list based on pinpoint running
 	return_list = [cxyz_sa_endo, cxyz_sa_epi, rv_insertion_pts, setstruct] if ignore_pinpts else [cxyz_sa_endo, cxyz_sa_epi, rv_insertion_pts, setstruct, septal_slice]

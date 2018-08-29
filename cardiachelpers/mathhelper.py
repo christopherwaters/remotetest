@@ -96,12 +96,11 @@ def findMidPt(endo_pins, time_id, septal_slice, endo_x, endo_y):
 	returns:
 		array mid_pt: The septal midpoint between the two other pinpoints
 	"""
-	
 	if endo_pins.ndim < 2:
 		endo_pins = np.expand_dims(endo_pins, 0)
 	# Get mean point between the 2 pinpoints.
 	mean_pt = np.mean(endo_pins, axis=0).reshape([2, 1])
-	
+
 	# Calculate the perpindicular line between the two points (just slope, no intercept)
 	slope = (endo_pins[1,1] - endo_pins[0,1])/(endo_pins[1,0] - endo_pins[0,0])
 	perp_slope = -1/slope
