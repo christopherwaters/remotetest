@@ -181,7 +181,6 @@ def transformStack(setstruct, slice_number=0, layer='endo'):
 		y_pix = setstruct['endo_y'][:,slice_number,:]
 		run_xyz = True
 	# If endo, epi, or scar where there are no NaN values:
-	if not(layer == 'long'): print(x_pix.shape)
 	if run_xyz:
 		# Round the x_pix and y_pix arrays
 		x_pix_round = np.round(x_pix)
@@ -216,9 +215,11 @@ def transformStack(setstruct, slice_number=0, layer='endo'):
 				# Sort the pix_arr array, putting 0 values at the bottom of the list
 				#		Primary sort is along the second column, secondary sort along the first
 				#		The conversion to and from NaN puts 0 values at the end of the list instead of the front
+				pix_arr = pix_arr.astype(float)
 				pix_arr[pix_arr == 0] = np.nan
 				pix_arr = pix_arr[:, np.argsort(pix_arr[1], kind='mergesort')]
 				pix_arr[np.isnan(pix_arr)] = 0
+				pix_arr = pix_arr.astype(int)
 			# Set perim_xy_pts to be pix arr, with the first point repeated at the end
 			pix_append = np.reshape(pix_arr[:, 0], [2,1])
 			perim_xy_pts = np.append(pix_arr.transpose(),pix_append.transpose(),axis=0)

@@ -239,15 +239,19 @@ class MRIModel():
 		
 		scar_endo = [None]*len(scar_slices)
 		scar_epi = [None]*len(scar_slices)
+		scar_pts = [None]*len(scar_slices)
 		self.lge_endo_rotate = [None]*len(scar_endo)
 		self.lge_epi_rotate = [None]*len(scar_epi)
+		self.lge_pts_rotate = [None]*len(scar_pts)
 		#time_pts = np.unique(scar_endo_stack[:, 3])
 		
 		for i, slice_num in enumerate(scar_slices):
 			scar_endo[i] = scar_endo_stack[np.where(scar_endo_stack[:, 4] == slice_num+1)[0], :3]
 			scar_epi[i] = scar_epi_stack[np.where(scar_epi_stack[:, 4] == slice_num+1)[0], :3]
+			scar_pts[i] = scar_pt_stack[np.where(scar_pt_stack[:, 4] == slice_num+1)[0], :3]
 			self.lge_endo_rotate[i], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(scar_endo[i], apex_pt, base_pt, center_septal_pt)
 			self.lge_epi_rotate[i], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(scar_epi[i], apex_pt, base_pt, center_septal_pt)
+			self.lge_pts_rotate[i], _, _, _ = stackhelper.rotateDataCoordinates(scar_pts[i], apex_pt, base_pt, center_septal_pt)
 			#endo_slice_by_time = [None]*len(time_pts)
 			#epi_slice_by_time = [None]*len(time_pts)
 			#for j, time_pt in enumerate(time_pts):
