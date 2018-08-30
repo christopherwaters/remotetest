@@ -67,7 +67,7 @@ def cart2prolate(x, y, z, focus):
 		# Set the prolate values lambda (z1), mu (z2), and theta (z3)
 		z1 = math.log(a6 + math.sqrt(a4+1))
 		z2 = a8 if x1 >= 0 else math.pi - a8
-		z3 = math.fmod(a9, 2*math.pi) if x2 >= 0 else math.pi-a9
+		z3 = math.fmod(a9+2*math.pi, 2*math.pi) if x2 >= 0 else math.pi-a9
 		# Store the singular values into the array
 		if matrix_flag:
 			m[jz] = z1
@@ -131,7 +131,21 @@ def findMidPt(endo_pins, time_id, septal_slice, endo_x, endo_y):
 	# Reconvert the interpolated rho and theta to cartesian
 	mid_pt = (pol2cart(theta, r) + mean_pt.reshape([1,2])).reshape(2)
 	return(mid_pt)
-	
+
+def getBinValues(values_in, bin_edges):
+	bin_index = np.empty((len(values_in))) if isinstance(values_in, list) else np.empty((values_in.size))
+	bin_counts = [None]*(len(bin_edges) - 1)
+	value_list = values_in if isinstance(values_in, list) else values_in.flatten()
+	for cur_bin in range(len(bin_edges) - 1):
+		bin_bot = bin_edges[cur_bin]
+		bin_top = bin_edges[cur_bin + 1]
+		
+		items_in_bin = np.where(np.logical_and(np.greater_equal(value_list, bin_bot), np.less(value_list, bin_top)))[0]
+		bin_counts[cur_bin] = len(items_in_bin)
+		bin_index[items_in_bin] = cur_bin
+		
+	return(bin_counts, list(bin_index.astype(int)))
+		
 def getAngleRange(angles):
 	"""Get the leftmost and rightmost values from a passed series of angles.
 	

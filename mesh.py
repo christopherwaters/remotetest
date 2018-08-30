@@ -82,6 +82,10 @@ class Mesh():
 		epi_node_list = np.subtract(lv_geom['eEPI'], 1)
 		self.epi_nodes = self.hex[epi_node_list, :][:, [2, 3, 6, 7]]
 	
+	def rotateNodesProlate(self):
+		nodes_prol_list = mathhelper.cart2prolate(self.nodes[:, 0], self.nodes[:, 1], self.nodes[:, 2], self.focus)
+		self.nodes_prol = np.column_stack(tuple(nodes_prol_list))
+	
 	def fitContours(self, all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, mesh_type):
 		"""Function to Perform the Contour Fitting from the Passed Endo and Epi Contour data.
 		

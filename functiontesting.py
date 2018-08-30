@@ -27,6 +27,10 @@ mri_model = mrimodel.MRIModel(sa_filename, la_pinpt_filename, sa_scar_file=sa_fi
 mri_model.importCine()
 mri_model.importLGE()
 mri_model.importScarLA()
+
+mri_model.convertDataProlate(mri_mesh.focus)
+mri_mesh.rotateNodesProlate()
+
 mri_model.alignScar()
 
 '''

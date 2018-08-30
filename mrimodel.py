@@ -412,14 +412,73 @@ class MRIModel():
 	def alignScar(self, timepoint=0):
 		"""Scar alignment designed to include long-axis scar data.
 		"""
-		self.rot_scar_la_endo = [None]*len(self.la_scar_files)
-		self.rot_scar_la_epi = [None]*len(self.la_scar_files)
+		num_bins = 50
+		theta_bins = np.linspace(0, 2*math.pi, num_bins+1)
+		theta_centers = [(theta_bins[i] + theta_bins[i+1])/2 for i in range(len(theta_bins) - 1)]
 		
-		apex_pt = self.apex_base_pts[0, :]
-		base_pt = self.apex_base_pts[1, :]
-		center_septal_pt = np.expand_dims(self.rv_insertion_pts[2, :], 0)
-		#for i in range(len(self.la_scar_files)):
-			#self.rot_scar_la_endo[i], self.rot_scar_la_epi[i], _, _, _ = stackhelper.rotateDataCoordinates(self.scar_la_endo[i], self.scar_la_epi[i], apex_pt, base_pt, center_septal_pt)
+		for slice_num in range(len(self.lge_epi_prol)):
+			interp_theta_func = sp.interpolate.interp1d(self.lge_epi_prol[slice_num][:, 2], self.lge_epi_prol[slice_num][:, :2], axis=0, kind='linear', fill_value='extrapolate')
+			interp_theta_centers = interp_theta_func(theta_centers)
+			
+			bin_counts, bin_index = mathhelper.getBinValues(self.lge_epi_prol[slice_num][:, 2], theta_bins)
+			print(bin_index)
+	
+	def convertDataProlate(self, focus):
+		"""Convert all data from a rotated axis into prolate spheroid coordinates for further alignment.
+		"""
+		# Convert cine endocardial and epicardial traces
+		cine_endo_prol = [None]*len(self.cine_endo_rotate)
+		cine_epi_prol = [None]*len(self.cine_epi_rotate)
+		
+		for slice_num in range(len(self.cine_endo_rotate)):
+			cine_endo_prol_time = [None]*len(self.cine_endo_rotate[slice_num])
+			cine_epi_prol_time = [None]*len(self.cine_epi_rotate[slice_num])
+			for time_pt in range(len(self.cine_endo_rotate[slice_num])):
+				cine_endo_rot_time = self.cine_endo_rotate[slice_num][time_pt]
+				cine_epi_rot_time = self.cine_epi_rotate[slice_num][time_pt]
+				cine_endo_prol_time[time_pt] = np.column_stack(tuple(mathhelper.cart2prolate(cine_endo_rot_time[:, 0], cine_endo_rot_time[:, 1], cine_endo_rot_time[:, 2], focus)))
+				cine_epi_prol_time[time_pt] = np.column_stack(tuple(mathhelper.cart2prolate(cine_epi_rot_time[:, 0], cine_epi_rot_time[:, 1], cine_epi_rot_time[:, 2], focus)))
+			cine_endo_prol[slice_num] = cine_endo_prol_time
+			cine_epi_prol[slice_num] = cine_epi_prol_time
+			
+		self.cine_endo_prol = cine_endo_prol
+		self.cine_epi_prol = cine_epi_prol
+		
+		# Convert Short-Axis LGE endocardial, epicardial, and scar-point traces
+		lge_endo_prol = [None]*len(self.lge_endo_rotate)
+		lge_epi_prol = [None]*len(self.lge_epi_rotate)
+		lge_pts_prol = [None]*len(self.lge_pts_rotate)
+		
+		for i in range(len(self.lge_endo_rotate)):
+			lge_endo_prol_list = mathhelper.cart2prolate(self.lge_endo_rotate[i][:, 0], self.lge_endo_rotate[i][:, 1], self.lge_endo_rotate[i][:, 2], focus)
+			lge_epi_prol_list = mathhelper.cart2prolate(self.lge_epi_rotate[i][:, 0], self.lge_epi_rotate[i][:, 1], self.lge_epi_rotate[i][:, 2], focus)
+			lge_pts_prol_list = mathhelper.cart2prolate(self.lge_pts_rotate[i][:, 0], self.lge_pts_rotate[i][:, 1], self.lge_pts_rotate[i][:, 2], focus)
+			
+			lge_endo_prol[i] = np.column_stack(tuple(lge_endo_prol_list))
+			lge_epi_prol[i] = np.column_stack(tuple(lge_epi_prol_list))
+			lge_pts_prol[i] = np.column_stack(tuple(lge_pts_prol_list))
+			
+		self.lge_endo_prol = lge_endo_prol
+		self.lge_epi_prol = lge_epi_prol
+		self.lge_pts_prol = lge_pts_prol
+		
+		# Convert long-axis LGE endocardial, epicardial, and scar-point traces
+		lge_la_endo_prol = [None]*len(self.lge_la_endo_rotate)
+		lge_la_epi_prol = [None]*len(self.lge_la_epi_rotate)
+		lge_la_pts_prol = [None]*len(self.lge_la_pts_rotate)
+		
+		for i in range(len(self.lge_la_endo_rotate)):
+			lge_la_endo_prol_list = mathhelper.cart2prolate(self.lge_la_endo_rotate[i][:, 0], self.lge_la_endo_rotate[i][:, 1], self.lge_la_endo_rotate[i][:, 2], focus)
+			lge_la_epi_prol_list = mathhelper.cart2prolate(self.lge_la_epi_rotate[i][:, 0], self.lge_la_epi_rotate[i][:, 1], self.lge_la_epi_rotate[i][:, 2], focus)
+			lge_la_pts_prol_list = mathhelper.cart2prolate(self.lge_la_pts_rotate[i][:, 0], self.lge_la_pts_rotate[i][:, 1], self.lge_la_pts_rotate[i][:, 2], focus)
+			
+			lge_la_endo_prol[i] = np.column_stack(tuple(lge_la_endo_prol_list))
+			lge_la_epi_prol[i] = np.column_stack(tuple(lge_la_epi_prol_list))
+			lge_la_pts_prol[i] = np.column_stack(tuple(lge_la_pts_prol_list))
+			
+		self.lge_la_endo_prol = lge_la_endo_prol
+		self.lge_la_epi_prol = lge_la_epi_prol
+		self.lge_la_pts_prol = lge_la_pts_prol
 	
 	def alignScarCine(self, timepoint=0):
 		"""A method of aligning scar and cine data
