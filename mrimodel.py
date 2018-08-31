@@ -420,8 +420,17 @@ class MRIModel():
 			interp_theta_func = sp.interpolate.interp1d(self.lge_epi_prol[slice_num][:, 2], self.lge_epi_prol[slice_num][:, :2], axis=0, kind='linear', fill_value='extrapolate')
 			interp_theta_centers = interp_theta_func(theta_centers)
 			
-			bin_counts, bin_index = mathhelper.getBinValues(self.lge_epi_prol[slice_num][:, 2], theta_bins)
-			print(bin_index)
+			endo_bin_counts, endo_bin_index = mathhelper.getBinValues(self.lge_endo_prol[slice_num][:, 2], theta_bins)
+			epi_bin_counts, epi_bin_index = mathhelper.getBinValues(self.lge_epi_prol[slice_num][:, 2], theta_bins)
+			pts_bin_counts, pts_bin_index = mathhelper.getBinValues(self.lge_pts_prol[slice_num][:, 2], theta_bins)
+			
+			scar_width = np.empty((num_bins, 3))
+			for bin_num in range(num_bins):
+				endo_indices = np.where(np.array(endo_bin_index) == bin_num)[0]
+				epi_indices = np.where(np.array(epi_bin_index) == bin_num)[0]
+				print(self.lge_endo_rotate[slice_num][endo_indices, :])
+				endo_point = np.nanmean(self.lge_endo_rotate[slice_num][endo_indices, :], axis=0) if endo_indices.size else np.full([1, 3], np.nan)
+				epi_point = np.nanmean(self.lge_epi_rotate[slice_num][epi_indices, :], axis=0) if epi_indices.size else np.full([1, 3], np.nan)
 	
 	def convertDataProlate(self, focus):
 		"""Convert all data from a rotated axis into prolate spheroid coordinates for further alignment.
