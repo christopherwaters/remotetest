@@ -245,7 +245,6 @@ class MRIModel():
 		self.lge_endo_rotate = [None]*len(scar_endo)
 		self.lge_epi_rotate = [None]*len(scar_epi)
 		self.lge_pts_rotate = [None]*len(scar_pts)
-		#time_pts = np.unique(scar_endo_stack[:, 3])
 		
 		for i, slice_num in enumerate(scar_slices):
 			scar_endo[i] = scar_endo_stack[np.where(scar_endo_stack[:, 4] == slice_num+1)[0], :3]
@@ -254,25 +253,12 @@ class MRIModel():
 			self.lge_endo_rotate[i], _, self.transform_basis, self.origin = stackhelper.rotateDataCoordinates(scar_endo[i], apex_pt, base_pt, center_septal_pt)
 			self.lge_epi_rotate[i], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(scar_epi[i], apex_pt, base_pt, center_septal_pt)
 			self.lge_pts_rotate[i], _, _, _ = stackhelper.rotateDataCoordinates(scar_pts[i], apex_pt, base_pt, center_septal_pt)
-			#endo_slice_by_time = [None]*len(time_pts)
-			#epi_slice_by_time = [None]*len(time_pts)
-			#for j, time_pt in enumerate(time_pts):
-			#	endo_slice_by_time[j] = endo_by_slice[np.where(endo_by_slice[:, 3] == time_pt)[0], :3]
-			#	epi_slice_by_time[j] = epi_by_slice[np.where(epi_by_slice[:, 3] == time_pt)[0], :3]
-			#scar_endo[i] = endo_slice_by_time
-			#scar_epi[i] = epi_slice_by_time
-
-		# Get the x-y values from the mask
-		#scar_abs, scar_endo, scar_epi, scar_ratio, scar_slices = stackhelper.getMaskContour(scar_endo_stack, scar_epi_stack, scar_insertion_pts, scarstruct, scar_septal_slice, scar_combined, self.apex_base_pts)
 		
 		# Store instance fields
-		#self.lge_apex_pt = scar_abs[0]
-		#self.lge_basal_pt = scar_abs[1]
 		self.lge_septal_pts = scar_insertion_pts
 		self.lge_endo = scar_endo
 		self.lge_epi = scar_epi
 		self.scar_slices = scar_slices
-		#self.scar_ratio = scar_ratio
 		
 		return(True)
 		
@@ -412,25 +398,8 @@ class MRIModel():
 	def alignScar(self, timepoint=0):
 		"""Scar alignment designed to include long-axis scar data.
 		"""
-		num_bins = 50
-		theta_bins = np.linspace(0, 2*math.pi, num_bins+1)
-		theta_centers = [(theta_bins[i] + theta_bins[i+1])/2 for i in range(len(theta_bins) - 1)]
-		
-		for slice_num in range(len(self.lge_epi_prol)):
-			interp_theta_func = sp.interpolate.interp1d(self.lge_epi_prol[slice_num][:, 2], self.lge_epi_prol[slice_num][:, :2], axis=0, kind='linear', fill_value='extrapolate')
-			interp_theta_centers = interp_theta_func(theta_centers)
-			
-			endo_bin_counts, endo_bin_index = mathhelper.getBinValues(self.lge_endo_prol[slice_num][:, 2], theta_bins)
-			epi_bin_counts, epi_bin_index = mathhelper.getBinValues(self.lge_epi_prol[slice_num][:, 2], theta_bins)
-			pts_bin_counts, pts_bin_index = mathhelper.getBinValues(self.lge_pts_prol[slice_num][:, 2], theta_bins)
-			
-			scar_width = np.empty((num_bins, 3))
-			for bin_num in range(num_bins):
-				endo_indices = np.where(np.array(endo_bin_index) == bin_num)[0]
-				epi_indices = np.where(np.array(epi_bin_index) == bin_num)[0]
-				print(self.lge_endo_rotate[slice_num][endo_indices, :])
-				endo_point = np.nanmean(self.lge_endo_rotate[slice_num][endo_indices, :], axis=0) if endo_indices.size else np.full([1, 3], np.nan)
-				epi_point = np.nanmean(self.lge_epi_rotate[slice_num][epi_indices, :], axis=0) if epi_indices.size else np.full([1, 3], np.nan)
+		self.interp_epi_surf, self.wall_scar = stackhelper.interpShortScar(50, self.lge_epi_prol, self.lge_endo_prol, self.lge_pts_prol, self.lge_epi_rotate, self.lge_endo_rotate, self.lge_pts_rotate)
+		self.interp_epi_la_surf, self.wall_scar_la = stackhelper.interpLongScar(20, self.lge_la_epi_prol, self.lge_la_endo_prol, self.lge_la_pts_prol, self.lge_la_epi_rotate, self.lge_la_endo_rotate, self.lge_la_pts_rotate)
 	
 	def convertDataProlate(self, focus):
 		"""Convert all data from a rotated axis into prolate spheroid coordinates for further alignment.

@@ -133,7 +133,7 @@ def findMidPt(endo_pins, time_id, septal_slice, endo_x, endo_y):
 	return(mid_pt)
 
 def getBinValues(values_in, bin_edges):
-	bin_index = np.empty((len(values_in))) if isinstance(values_in, list) else np.empty((values_in.size))
+	bin_index = np.full((len(values_in)), np.nan) if isinstance(values_in, list) else np.full((values_in.size), np.nan)
 	bin_counts = [None]*(len(bin_edges) - 1)
 	value_list = values_in if isinstance(values_in, list) else values_in.flatten()
 	for cur_bin in range(len(bin_edges) - 1):
@@ -143,7 +143,9 @@ def getBinValues(values_in, bin_edges):
 		items_in_bin = np.where(np.logical_and(np.greater_equal(value_list, bin_bot), np.less(value_list, bin_top)))[0]
 		bin_counts[cur_bin] = len(items_in_bin)
 		bin_index[items_in_bin] = cur_bin
-		
+	#if bin_index.size:
+		#bin_index[np.where(np.greater(value_list, max(bin_edges)))[0]] = max(bin_index)
+		#bin_index[np.where(np.less(value_list, min(bin_edges)))[0]] = min(bin_index)
 	return(bin_counts, list(bin_index.astype(int)))
 		
 def getAngleRange(angles):

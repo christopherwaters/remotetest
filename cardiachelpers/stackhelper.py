@@ -412,10 +412,7 @@ def rotateStack(setstruct, slice_labels, layer='endo', axial_flag=False):
 	"""
 	
 	# Set up initial variables for future use.
-	slice_counter = 1
 	cxyz = np.array([])
-	#heartrate = np.array([])
-	#hr = setstruct['HeartRate']
 	
 	# Determine orientation of image and exit if it is correct
 	if axial_flag:
@@ -433,8 +430,6 @@ def rotateStack(setstruct, slice_labels, layer='endo', axial_flag=False):
 		cxyz = np.append(cxyz, cxyz_slice)
 		# Track heartrate during each slice acquisition
 		#heartrate = np.append(heartrate, [hr, slice_counter])
-		# Update the slice counter (it can differ from slice_labels due to skipped slices)
-		slice_counter += 1
 		# Determine what values to return based on the layer selected.
 		if layer == 'epi' or layer == 'mask':
 			m_arr = transformed_stack[1]
@@ -574,13 +569,9 @@ def getMaskContour(mask_endo_stack, mask_epi_stack, mask_insertion_pts, mask_str
 def getMaskXY(mask, kept_slices):
 	"""General form to get binary masks (such as scar data) as xy overlays.
 	"""
-	#kept_slices = maskstruct['KeptSlices']
-	#mask_max = max([sum(sum(mask[i])) for i in range(mask.shape[0])])
 	mask_pts = np.array(np.where(mask)) + 1
 	mask_slices = np.array(list(set(mask_pts[0, :])))
 	mask_pts[0] -= 1
-	#mask_x = np.zeros([mask.shape[0], mask_max])
-	#mask_y = np.zeros([mask.shape[0], mask_max])
 	mask_x = [None]*mask.shape[0]
 	mask_y = [None]*mask.shape[0]
 	for i in mask_slices:
@@ -588,17 +579,6 @@ def getMaskXY(mask, kept_slices):
 		temp_y = mask_pts[2, np.where(mask_pts[0, :] == i-1)]
 		mask_x[i-1] = temp_x
 		mask_y[i-1] = temp_y
-	#maskstruct['mask_x'] = mask_x
-	#maskstruct['mask_y'] = mask_y
-	#cxyz_mask, mask_m, _ = rotateStack(maskstruct, kept_slices, layer='mask')
-	'''for i in mask_slices:
-		cxyz_slice = cxyz_mask[np.where(cxyz_mask[:, 4] == i), :][0]
-		mode_val, mode_count = spstats.mode(cxyz_slice[:, 0:2])
-		max_mode = max(mode_count.squeeze())
-		if max_mode > 1:
-			mode_ind = np.argmax(mode_count.squeeze())
-			cur_mode = mode_val.squeeze()[mode_ind]
-			cxyz_mask = np.delete(cxyz_mask, np.where(cxyz_mask[:, mode_ind] == cur_mode), axis=0)'''
 	return([mask_x, mask_y])
 
 def convertSlicesToPolar(slices, endo, epi, scar=None, scar_flag=False, num_bins = 50):
@@ -723,6 +703,47 @@ def shiftPolarCartesian(endo_polar, epi_polar, endo, epi, kept_slices, axis_cent
 	new_cine_epi = temp_cine_epi.reshape([temp_cine_epi.shape[0]*temp_cine_epi.shape[1], temp_cine_epi.shape[2]])
 
 	return([new_cine_endo, new_cine_epi])
+
+def interpShortScar(num_bins, epi_prol, endo_prol, pts_prol, epi_rot, endo_rot, pts_rot):
+	theta_bins = np.linspace(0, 2*math.pi, num_bins+1)
+	theta_centers = [(theta_bins[i] + theta_bins[i+1])/2 for i in range(len(theta_bins) - 1)]
+	scar_width_combined = [None]*len(epi_prol)
+	theta_centers_combined = [None]*len(epi_prol)
+	for slice_num in range(len(epi_prol)):
+		wall_scar, interp_theta_centers = __wallScarCalculations(num_bins, epi_prol[slice_num], endo_prol[slice_num], pts_prol[slice_num], epi_rot[slice_num], endo_rot[slice_num], pts_rot[slice_num], theta_bins, theta_centers)
+		theta_centers_combined[slice_num] = np.column_stack((interp_theta_centers, theta_centers))
+		scar_width_combined[slice_num] = wall_scar
+	return([theta_centers_combined, scar_width_combined])
+	
+def interpLongScar(num_bins, epi_prol, endo_prol, pts_prol, epi_rot, endo_rot, pts_rot):
+	mu_bins = np.linspace(0, 120*math.pi/180, num_bins+1)
+	mu_centers = [(mu_bins[i] + mu_bins[i+1])/2 for i in range(len(mu_bins) - 1)]
+	wall_scar_combined = [None]*len(epi_prol)
+	interp_surface_combined = [None]*len(epi_prol)
+	for slice_num in range(len(epi_prol)):
+		mid_point = np.mean(epi_prol[slice_num][:, 2])
+		edges = [mid_point-math.pi, mid_point, mid_point+math.pi]
+		endo_edge_index = mathhelper.getBinValues(endo_prol[slice_num][:, 2], edges)[1]
+		epi_edge_index = mathhelper.getBinValues(epi_prol[slice_num][:, 2], edges)[1]
+		pts_edge_index = mathhelper.getBinValues(pts_prol[slice_num][:, 2], edges)[1]
+
+		wall_scar_slice = np.array([])
+		interp_surface_slice = np.array([])
+		for bin_val in range(len(edges)-1):
+			endo_prol_bin = endo_prol[slice_num][np.where([endo_edge_val == bin_val for endo_edge_val in endo_edge_index])[0], :]
+			epi_prol_bin = epi_prol[slice_num][np.where([epi_edge_val == bin_val for epi_edge_val in epi_edge_index])[0], :]
+			pts_prol_bin = pts_prol[slice_num][np.where([pts_edge_val == bin_val for pts_edge_val in pts_edge_index])[0], :]
+			endo_rot_bin = endo_rot[slice_num][np.where([endo_edge_val == bin_val for endo_edge_val in endo_edge_index])[0], :]
+			epi_rot_bin = epi_rot[slice_num][np.where([epi_edge_val == bin_val for epi_edge_val in epi_edge_index])[0], :]
+			pts_rot_bin = pts_rot[slice_num][np.where([pts_edge_val == bin_val for pts_edge_val in pts_edge_index])[0], :]
+			
+			wall_scar, interp_mu_centers = __wallScarCalculations(num_bins, epi_prol_bin, endo_prol_bin, pts_prol_bin, epi_rot_bin, endo_rot_bin, pts_rot_bin, mu_bins, mu_centers, long_axis=True)
+			epi_surf_stack = np.column_stack((interp_mu_centers[:, 0], mu_centers, interp_mu_centers[:, 1]))
+			interp_surface_slice = np.append(interp_surface_slice, epi_surf_stack, axis=0) if interp_surface_slice.size else epi_surf_stack
+			wall_scar_slice = np.append(wall_scar_slice, wall_scar, axis=0) if wall_scar_slice.size else wall_scar
+		wall_scar_combined[slice_num] = wall_scar_slice
+		interp_surface_combined[slice_num] = interp_surface_slice
+	return([interp_surface_combined, wall_scar_combined])
 	
 def _generateTransformMatrix(setstruct):
 	# Pull values from the setstruct dict
@@ -753,3 +774,29 @@ def _generateTransformMatrix(setstruct):
 	# Multiply t_ipp, r_eye, s_eye, and t_o and store as m_arr
 	m_arr = t_ipp@r_eye@s_eye@t_o
 	return(m_arr)
+	
+def __wallScarCalculations(num_bins, epi_prol, endo_prol, pts_prol, epi_rot, endo_rot, pts_rot, angle_bins, angle_centers, long_axis=False):
+	interp_function = sp.interpolate.interp1d(epi_prol[:, 1], epi_prol[:, [0, 2]], axis=0, kind='linear', fill_value='extrapolate') if long_axis else sp.interpolate.interp1d(epi_prol[:, 2], epi_prol[:, :2], axis=0, kind='linear', fill_value='extrapolate')
+	interp_centers = interp_function(angle_centers)
+	
+	_, epi_bin_index = mathhelper.getBinValues(epi_prol[:, 1], angle_bins) if long_axis else mathhelper.getBinValues(epi_prol[:, 2], angle_bins)
+	_, endo_bin_index = mathhelper.getBinValues(endo_prol[:, 1], angle_bins) if long_axis else mathhelper.getBinValues(endo_prol[:, 2], angle_bins)
+	_, pts_bin_index = mathhelper.getBinValues(pts_prol[:, 1], angle_bins) if long_axis else mathhelper.getBinValues(pts_prol[:, 2], angle_bins)
+	
+	wall_scar = np.empty((num_bins, 3))
+	wall_scar[:] = np.nan
+	for bin_num in range(num_bins):
+		endo_indices = np.where(np.array(endo_bin_index) == bin_num)[0]
+		epi_indices = np.where(np.array(epi_bin_index) == bin_num)[0]
+		scar_indices = np.where(np.array(pts_bin_index) == bin_num)[0]
+		endo_point = np.nanmean(endo_rot[endo_indices, :], axis=0) if endo_indices.size else np.full([1, 3], np.nan)
+		epi_point = np.nanmean(epi_rot[epi_indices, :], axis=0) if epi_indices.size else np.full([1, 3], np.nan)
+		wall_scar[bin_num, 0] = math.sqrt(np.sum(np.square(epi_point - endo_point)))
+		if len(scar_indices) > 2:
+			scar_points = np.append(pts_rot[scar_indices, :], pts_prol[scar_indices, :], axis=1)
+			scar_pts_ordered = scar_points[np.argsort(scar_points[:, 3]), :]
+			endo_scar_pt = scar_pts_ordered[0, 0:3]
+			epi_scar_pt = scar_pts_ordered[-1, 0:3]
+			wall_scar[bin_num, 1] = math.sqrt(np.sum(np.square(epi_scar_pt - endo_scar_pt)))/wall_scar[bin_num, 0]
+			wall_scar[bin_num, 2] = math.sqrt(np.sum(np.square(epi_point - epi_scar_pt)))/wall_scar[bin_num, 0]
+	return(wall_scar, interp_centers)
