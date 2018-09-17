@@ -399,7 +399,30 @@ class MRIModel():
 		"""Scar alignment designed to include long-axis scar data.
 		"""
 		self.interp_epi_surf, self.wall_scar = stackhelper.interpShortScar(50, self.lge_epi_prol, self.lge_endo_prol, self.lge_pts_prol, self.lge_epi_rotate, self.lge_endo_rotate, self.lge_pts_rotate)
+		for slice_num in range(len(self.wall_scar)):
+			temp_slice = self.wall_scar[slice_num]
+			temp_slice[np.isnan(temp_slice[:, 1]), 1] = 0
+			self.wall_scar[slice_num] = temp_slice
 		self.interp_epi_la_surf, self.wall_scar_la = stackhelper.interpLongScar(20, self.lge_la_epi_prol, self.lge_la_endo_prol, self.lge_la_pts_prol, self.lge_la_epi_rotate, self.lge_la_endo_rotate, self.lge_la_pts_rotate)
+		for slice_num in range(len(self.wall_scar_la)):
+			temp_slice = self.wall_scar_la[slice_num]
+			temp_slice[np.isnan(temp_slice[:, 1]), 1] = 0
+			self.wall_scar_la[slice_num] = temp_slice
+		temp_data_arr = np.empty([0, 6])
+		for slice_num in range(len(self.wall_scar)):
+			temp_slice_arr = np.column_stack((self.interp_epi_surf[slice_num], self.wall_scar[slice_num]))
+			temp_data_arr = np.vstack((temp_data_arr, temp_slice_arr))
+		for slice_num in range(len(self.wall_scar_la)):
+			temp_slice_arr = np.column_stack((self.interp_epi_la_surf[slice_num], self.wall_scar_la[slice_num]))
+			temp_data_arr = np.vstack((temp_data_arr, temp_slice_arr))
+		nan_rows = ~np.isnan(temp_data_arr[:, 1])
+		print(temp_data_arr[99, :])
+		interp_data = temp_data_arr[nan_rows, :]
+		interp_data = interp_data[:, [2, 1, 4, 5]]
+		interp_data_inc = np.column_stack((interp_data[:, 0]+2*math.pi, interp_data[:, 1:]))
+		interp_data_dec = np.column_stack((interp_data[:, 0]-2*math.pi, interp_data[:, 1:]))
+		interp_data_complete = np.vstack((interp_data, interp_data_inc, interp_data_dec))
+		print(interp_data_inc.shape)
 	
 	def convertDataProlate(self, focus):
 		"""Convert all data from a rotated axis into prolate spheroid coordinates for further alignment.
