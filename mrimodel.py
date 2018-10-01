@@ -416,13 +416,12 @@ class MRIModel():
 			temp_slice_arr = np.column_stack((self.interp_epi_la_surf[slice_num], self.wall_scar_la[slice_num]))
 			temp_data_arr = np.vstack((temp_data_arr, temp_slice_arr))
 		nan_rows = ~np.isnan(temp_data_arr[:, 1])
-		print(temp_data_arr[99, :])
 		interp_data = temp_data_arr[nan_rows, :]
 		interp_data = interp_data[:, [2, 1, 4, 5]]
 		interp_data_inc = np.column_stack((interp_data[:, 0]+2*math.pi, interp_data[:, 1:]))
 		interp_data_dec = np.column_stack((interp_data[:, 0]-2*math.pi, interp_data[:, 1:]))
 		interp_data_complete = np.vstack((interp_data, interp_data_inc, interp_data_dec))
-		print(interp_data_inc.shape)
+		self.interp_data = interp_data_complete
 	
 	def convertDataProlate(self, focus):
 		"""Convert all data from a rotated axis into prolate spheroid coordinates for further alignment.

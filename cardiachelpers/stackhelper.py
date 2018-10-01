@@ -776,7 +776,8 @@ def _generateTransformMatrix(setstruct):
 	return(m_arr)
 	
 def __wallScarCalculations(num_bins, epi_prol, endo_prol, pts_prol, epi_rot, endo_rot, pts_rot, angle_bins, angle_centers, long_axis=False):
-	interp_function = sp.interpolate.interp1d(epi_prol[:, 1], epi_prol[:, [0, 2]], axis=0, kind='linear', fill_value='extrapolate') if long_axis else sp.interpolate.interp1d(epi_prol[:, 2], epi_prol[:, :2], axis=0, kind='linear', fill_value='extrapolate')
+	interp_function = sp.interpolate.interp1d(epi_prol[:, 1], epi_prol[:, [0, 2]], axis=0, kind='linear', fill_value='extrapolate') if long_axis else sp.interpolate.interp1d(epi_prol[:, 2], epi_prol[:, :2], axis=0, kind='linear', bounds_error=False)
+	# , fill_value='extrapolate'
 	interp_centers = interp_function(angle_centers)
 	
 	_, epi_bin_index = mathhelper.getBinValues(epi_prol[:, 1], angle_bins) if long_axis else mathhelper.getBinValues(epi_prol[:, 2], angle_bins)
