@@ -4,6 +4,10 @@ import mesh
 import numpy as np
 import warnings
 from cardiachelpers import displayhelper
+import matplotlib.pyplot as mplt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+import matplotlib.colors
 
 mesh_filename = 'C:/Users/cdw2be/Downloads/Code4Chris/data/LVGEOM_8x4_noshift.mat'
 feb_filename = 'C:/Users/cdw2be/Downloads/Code4Chris/data/temp_feb.feb'
@@ -17,7 +21,6 @@ time_point = 0
 mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
 mri_mesh.importPremadeMesh(mesh_filename)
 mri_mesh.generateFEFile(feb_filename)
-#displayhelper.displayMeshPostview(feb_filename)
 
 sa_filename = 'C:/Users/cdw2be/Downloads/Code4Chris/data/SA_LGE_Scar_Pnpts.mat'
 la_pinpt_filename = 'C:/Users/cdw2be/Downloads/Code4Chris/data/LA_LGE_2CH_Pnpts.mat'
@@ -32,7 +35,7 @@ mri_model.convertDataProlate(mri_mesh.focus)
 mri_mesh.rotateNodesProlate()
 
 mri_model.alignScar()
-test_interp_return = mri_mesh.interpScarData(mri_model.interp_data)
+scar_layers = mri_mesh.interpScarData(mri_model.interp_data)
 
 '''
 mri_model = mrimodel.MRIModel(sa_filename, la_filename, scar_file=lge_filename)

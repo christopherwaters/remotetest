@@ -17,6 +17,7 @@ from cardiachelpers import mathhelper
 from cardiachelpers import meshhelper
 from cardiachelpers import importhelper
 import matplotlib.pyplot as plt
+import warnings
 
 class Mesh():
 
@@ -419,27 +420,51 @@ class Mesh():
 		return(elem_displacements_x, elem_displacements_y)
 	
 	def interpScarData(self, interp_data):
-		#transmurality_interp = sp.interpolate.interp2d(interp_data[:, 0], interp_data[:, 1], interp_data[:, 2], kind='linear')
 		non_nan_inds = ~np.isnan(interp_data[:, 3])
-		#depth_interp = sp.interpolate.interp2d(interp_data[non_nan_inds, 0], interp_data[non_nan_inds, 1], interp_data[non_nan_inds, 2], kind='linear')
 		epi_nodes = self.nodes[self.epi_nodes, :]
 		epi_nodes_list = [epi_nodes[:, i, :] for i in range(epi_nodes.shape[1])]
 		epi_nodes_formatted = np.vstack(tuple(epi_nodes_list))
 		_, m_epi, t_epi = mathhelper.cart2prolate(epi_nodes_formatted[:, 0], epi_nodes_formatted[:, 1], epi_nodes_formatted[:, 2], self.focus)
-		#scar_tr = transmurality_interp(t_epi, m_epi)
-		#scar_dp = depth_interp(t_epi, m_epi)
-		transmurality_rbf = sp.interpolate.Rbf(interp_data[:, 0], interp_data[:, 1], interp_data[:, 2], function='cubic')
-		depth_rbf = sp.interpolate.Rbf(interp_data[non_nan_inds, 0], interp_data[non_nan_inds, 1], interp_data[non_nan_inds, 2], function='cubic')
+		
+		transmurality_rbf = sp.interpolate.Rbf(interp_data[:, 0], interp_data[:, 1], interp_data[:, 2], function='linear', smooth=0)
+		depth_rbf = sp.interpolate.Rbf(interp_data[non_nan_inds, 0], interp_data[non_nan_inds, 1], interp_data[non_nan_inds, 3], function='linear', smooth=0)
+		
 		scar_tr = transmurality_rbf(t_epi, m_epi)
 		scar_dp = depth_rbf(t_epi, m_epi)
-		#transmurality_rep = sp.interpolate.bisplrep(interp_data[:, 0], interp_data[:, 1], interp_data[:, 2])
-		#depth_rep = sp.interpolate.bisplrep(interp_data[non_nan_inds, 0], interp_data[non_nan_inds, 1], interp_data[non_nan_inds, 2])
-		#scar_tr = sp.interpolate.bisplev(t_epi, m_epi, transmurality_rep)
-		#scar_dp = sp.interpolate.bisplev(t_epi, m_epi, depth_rep)
-		#m_epi_lin = np.linspace(0, 2*math.pi/3, 100)
-		#t_epi_lin = np.linspace(0, 2*math.pi, 100)
-		#t_epi_mesh, m_epi_mesh = np.meshgrid(t_epi_lin, m_epi_lin)
-		return([m_epi, t_epi])
+		
+		scar_tr_reshape = np.transpose(np.reshape(scar_tr, (4, int(scar_tr.size/4))))
+		scar_dp_reshape = np.transpose(np.reshape(scar_dp, (4, int(scar_dp.size/4))))
+		scar_dp_reshape[np.where(scar_tr_reshape <= 0.0025)] = np.nan
+		
+		e_epi_tr = np.mean(scar_tr_reshape, axis=1)
+		with warnings.catch_warnings():
+			warnings.simplefilter("ignore", category=RuntimeWarning)
+			e_epi_wd = np.nanmean(scar_dp_reshape, axis=1)
+		
+		data_all = np.zeros((self.hex.shape[0]))
+		data_all[self.epi_node_list] = e_epi_tr
+		
+		scar_layers = np.around(e_epi_tr*self.elem_in_wall)
+		scar_layers[scar_layers <= 0] = 0
+		
+		epi_start = np.around(e_epi_wd*self.elem_in_wall)
+		epi_start[scar_layers == 0] = np.nan
+		
+		for cur_ind in range(scar_layers.shape[0]):
+			scar_span = scar_layers[cur_ind] + epi_start[cur_ind]
+			if scar_span > self.elem_in_wall:
+				scar_layers[cur_ind] = scar_layers[cur_ind] - 1
+		
+		elem_per_layer = int(self.num_rings) * int(self.elem_per_ring)
+		
+		scar_elems = []
+		for start_val in range(max(epi_start.astype(np.int32))):
+			outer_scar = self.epi_node_list[epi_start == start_val] - (elem_per_layer*start_val)
+			through_wall_scar = scar_layers[epi_start == start_val]
+			for wh in range(outer_scar.size):
+				for by in range(int(through_wall_scar[wh])):
+					scar_elems = np.append(scar_elems, outer_scar[wh] - elem_per_layer*by)
+		return(scar_elems)
 	
 	def getElemData(self, elem_list, data_out, average=True, timepoint=0):
 		"""Get specified data about the listed elements, returned as an array based on the type of data requested.
