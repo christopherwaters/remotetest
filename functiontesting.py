@@ -35,7 +35,7 @@ mri_model.convertDataProlate(mri_mesh.focus)
 mri_mesh.rotateNodesProlate()
 
 mri_model.alignScar()
-scar_layers = mri_mesh.interpScarData(mri_model.interp_data)
+scar_elements = mri_mesh.interpScarData(mri_model.interp_data)
 
 '''
 mri_model = mrimodel.MRIModel(sa_filename, la_filename, scar_file=lge_filename)
