@@ -464,7 +464,9 @@ class Mesh():
 			for wh in range(outer_scar.size):
 				for by in range(int(through_wall_scar[wh])):
 					scar_elems = np.append(scar_elems, outer_scar[wh] - elem_per_layer*by)
-		self.scar_elements = scar_elems
+		self.elems_in_scar = scar_elems
+		#self.nodes_in_scar = np.unique(self.hex[scar_elems, :].flatten())
+		#print(self.nodes_in_scar)
 		return(scar_elems)
 	
 	def getElemData(self, elem_list, data_out, average=True, timepoint=0):

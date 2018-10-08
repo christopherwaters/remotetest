@@ -28,6 +28,8 @@ class modelGUI(tk.Frame):
 		self.createWidgets()
 		self.scar_assign = False
 		self.dense_assign = False
+		self.mri_model = False
+		self.mri_mesh = False
 		
 		# Set row and column paddings
 		master.rowconfigure(0, pad=5)
@@ -35,6 +37,9 @@ class modelGUI(tk.Frame):
 		master.rowconfigure(2, pad=5)
 		master.rowconfigure(3, pad=5)
 		master.rowconfigure(4, pad=5)
+		master.rowconfigure(5, pad=5)
+		master.rowconfigure(6, pad=5)
+		master.rowconfigure(7, pad=5)
 		master.columnconfigure(8, pad=5)
 		master.columnconfigure(9, pad=5)
 		
@@ -50,7 +55,9 @@ class modelGUI(tk.Frame):
 		sa_filename = tk.StringVar()
 		la_filename = tk.StringVar()
 		lge_filename = tk.StringVar()
+		la_lge_filenames = tk.StringVar()
 		dense_filenames = tk.StringVar()
+		premade_mesh_filename = tk.StringVar()
 		confocal_dir = tk.StringVar()
 		self.scar_plot_bool = tk.IntVar(value=0)
 		self.dense_plot_bool = tk.IntVar(value=0)
@@ -62,27 +69,35 @@ class modelGUI(tk.Frame):
 		import_label.grid(row=0, column=0, columnspan=9)
 		ttk.Label(text='Short-Axis File:').grid(row=1, sticky='W')
 		ttk.Label(text='Long-Axis File:').grid(row=2, sticky='W')
-		ttk.Label(text='LGE File:').grid(row=3, sticky='W')
-		ttk.Label(text='DENSE Files:').grid(row=4, sticky='W')
-		ttk.Label(text='Confocal Directory:').grid(row=5, sticky='W')
+		ttk.Label(text='SA LGE File:').grid(row=3, sticky='W')
+		ttk.Label(text='LA LGE Files:').grid(row=4, sticky='W')
+		ttk.Label(text='DENSE Files:').grid(row=5, sticky='W')
+		ttk.Label(text='Confocal Directory:').grid(row=6, sticky='W')
+		ttk.Label(text='Premade Mesh File:').grid(row=7, sticky='W')
 		# 	Create entry objects
 		sa_file_entry = ttk.Entry(width=80, textvariable=sa_filename)
 		la_file_entry = ttk.Entry(width=80, textvariable=la_filename)
 		lge_file_entry = ttk.Entry(width=80, textvariable=lge_filename)
+		la_lge_file_entry = ttk.Entry(width=80, textvariable=la_lge_filenames)
 		dense_file_entry = ttk.Entry(width=80, textvariable=dense_filenames)
 		confocal_dir_entry = ttk.Entry(width=80, textvariable=confocal_dir)
+		premade_mesh_entry = ttk.Entry(width=80, textvariable=premade_mesh_filename)
 		# 	Place entry object
 		sa_file_entry.grid(row=1, column=1, columnspan=5)
 		la_file_entry.grid(row=2, column=1, columnspan=5)
 		lge_file_entry.grid(row=3, column=1, columnspan=5)
-		dense_file_entry.grid(row=4, column=1, columnspan=5)
-		confocal_dir_entry.grid(row=5, column=1, columnspan=5)
+		la_lge_file_entry.grid(row=4, column=1, columnspan=5)
+		dense_file_entry.grid(row=5, column=1, columnspan=5)
+		confocal_dir_entry.grid(row=6, column=1, columnspan=5)
+		premade_mesh_entry.grid(row=7, column=1, columnspan=5)
 		#	Place "Browse" buttons
 		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(sa_file_entry)).grid(row=1, column=6)
 		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(la_file_entry)).grid(row=2, column=6)
 		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(lge_file_entry)).grid(row=3, column=6)
-		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(dense_file_entry, multi='True')).grid(row=4, column=6)
-		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(confocal_dir_entry, multi='Dir')).grid(row=5, column=6)
+		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(la_lge_file_entry, multi='True')).grid(row=4, column=6)
+		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(dense_file_entry, multi='True')).grid(row=5, column=6)
+		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(confocal_dir_entry, multi='Dir')).grid(row=6, column=6)
+		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(premade_mesh_entry)).grid(row=7, column=6)
 		
 		# Model Options
 		#	Place labels
@@ -92,7 +107,7 @@ class modelGUI(tk.Frame):
 		self.cine_timepoint_cbox.bind('<<ComboboxSelected>>', lambda _ : self.cineTimeChanged())
 		self.cine_timepoint_cbox.grid(row=1, column=8)
 		#	Buttons to generate models
-		ttk.Button(text='Generate MRI Model', command= lambda: self.createMRIModel(sa_filename, la_filename, lge_filename, dense_filenames)).grid(row=2, column=7, columnspan=2)
+		ttk.Button(text='Generate MRI Model', command= lambda: self.createMRIModel(sa_filename, la_filename, lge_filename, la_lge_filenames, dense_filenames)).grid(row=2, column=7, columnspan=2)
 		
 		
 		# Confocal Model Options
@@ -122,77 +137,75 @@ class modelGUI(tk.Frame):
 		mesh_type_cbox = ttk.Combobox(values=['4x2', '4x4', '4x8'], state='readonly', width=10)
 		self.conn_mat_cbox = ttk.Combobox(state='disabled', values=['hex', 'pent'], width=10)
 		#	Place mesh option entry boxes
-		num_rings_entry.grid(row=1, column=11)
-		elem_per_ring_entry.grid(row=2, column=11)
-		elem_thru_wall_entry.grid(row=3, column=11)
-		mesh_type_cbox.grid(row=4, column=11)
-		self.conn_mat_cbox.grid(row=5, column=11)
+		num_rings_entry.grid(row=1, column=11, sticky='W')
+		elem_per_ring_entry.grid(row=2, column=11, sticky='W')
+		elem_thru_wall_entry.grid(row=3, column=11, sticky='W')
+		mesh_type_cbox.grid(row=4, column=11, sticky='W')
+		self.conn_mat_cbox.grid(row=5, column=11, sticky='W')
 		#	Mesh option entry boxes default text and input validation
-		num_rings_entry.insert(0, '14')
-		elem_per_ring_entry.insert(0, '25')
+		num_rings_entry.insert(0, '28')
+		elem_per_ring_entry.insert(0, '48')
 		elem_thru_wall_entry.insert(0, '5')
 		num_rings_entry.configure(validate='key', validatecommand=(num_rings_entry.register(self.intValidate), '%P'))
 		elem_per_ring_entry.configure(validate='key', validatecommand=(num_rings_entry.register(self.intValidate), '%P'))
 		elem_thru_wall_entry.configure(validate='key', validatecommand=(num_rings_entry.register(self.intValidate), '%P'))
-		mesh_type_cbox.current(0)
+		mesh_type_cbox.current(2)
 		self.conn_mat_cbox.current(0)
 		#	Create mesh option buttons
-		self.meshButton = ttk.Button(text='Generate Model First', state='disabled', command= lambda: self.createMRIMesh(num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox))
+		self.premadeMeshButton = ttk.Button(text='Use Premade Mesh', state='enabled', command= lambda: self.createMRIMesh(num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, premade_mesh_file=premade_mesh_filename))
+		self.meshButton = ttk.Button(text='Generate Model First', state='disabled', command= lambda: self.createMRIMesh(num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox=mesh_type_cbox))
 		self.scar_fe_button = ttk.Button(text='Identify scar nodes', state='disabled', command= lambda: self.scarElem())
 		self.dense_fe_button = ttk.Button(text='Assign element displacements', state='disabled', command= lambda: self.denseElem())
 		self.scar_dense_button = ttk.Button(text='Get scar region DENSE average', state='disabled', command= lambda: self.scarDense())
 		#	Place mesh option buttons
-		self.meshButton.grid(row=9, column=10, columnspan=2)
-		self.scar_fe_button.grid(row=10, column=10, columnspan=2)
-		self.dense_fe_button.grid(row=11, column=10, columnspan=2)
-		self.scar_dense_button.grid(row=12, column=10, columnspan=2)
-
+		self.premadeMeshButton.grid(row=8, column=10, columnspan=2)
+		self.meshButton.grid(row=10, column=10, columnspan=2)
+		self.scar_fe_button.grid(row=11, column=10, columnspan=2)
+		self.dense_fe_button.grid(row=12, column=10, columnspan=2)
+		self.scar_dense_button.grid(row=13, column=10, columnspan=2)
+		
 		# FEBio File Creation
 		#	Place labels
 		postview_label = ttk.Label(text='Postview Options')
-		postview_label.grid(row=9, column=2, columnspan=7)
-		ttk.Label(text='Postview filename:').grid(row=10, column=2, sticky='W')
+		postview_label.grid(row=10, column=2, columnspan=7)
+		ttk.Label(text='Postview filename:').grid(row=11, column=2, sticky='W')
 		#	Create entry objects
 		self.postview_file_entry = ttk.Entry()
-		self.postview_file_entry.grid(row=10, column=3, columnspan=5, sticky='WE')
+		self.postview_file_entry.grid(row=11, column=3, columnspan=5, sticky='WE')
 		#	Buttons to create and open files
 		self.feb_file_button = ttk.Button(text='Generate FEBio File', state='disabled', command= lambda: self.genFebFile())
 		self.postview_open_button = ttk.Button(text='Launch PostView', state='disabled', command= lambda: self.openPostview())
-		self.feb_file_button.grid(row=11, column=3)
-		self.postview_open_button.grid(row=11, column=4)
+		self.feb_file_button.grid(row=12, column=3)
+		self.postview_open_button.grid(row=12, column=4)
 		#	Create "Browse" button
-		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(self.postview_file_entry, multi='Feb')).grid(row=10, column=8, sticky='W')
+		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(self.postview_file_entry, multi='Feb')).grid(row=11, column=8, sticky='W')
 		
 		# Plot Options
 		#	Place labels
-		ttk.Label(text='Plot nodes in mesh?').grid(row=9, column=0, sticky='W')
-		ttk.Label(text='Plot Scar?').grid(row=10, column=0, sticky='W')
-		ttk.Label(text='Plot DENSE?').grid(row=11, column=0, sticky='W')
-		ttk.Label(text='DENSE Timepoint:').grid(row=12, column=0, sticky='W')
+		ttk.Label(text='Plot nodes in mesh?').grid(row=10, column=0, sticky='W')
+		ttk.Label(text='Plot Scar?').grid(row=11, column=0, sticky='W')
+		ttk.Label(text='Plot DENSE?').grid(row=12, column=0, sticky='W')
+		ttk.Label(text='DENSE Timepoint:').grid(row=13, column=0, sticky='W')
 		#	DENSE Timepoint combobox
 		self.dense_timepoint_cbox = ttk.Combobox(state='disabled', width=5)
-		self.dense_timepoint_cbox.grid(row=12, column=1, sticky='W')
+		self.dense_timepoint_cbox.grid(row=13, column=1, sticky='W')
 		#	Options checkboxes
 		self.scar_cbutton = ttk.Checkbutton(variable = self.scar_plot_bool, state='disabled')
 		self.dense_cbutton = ttk.Checkbutton(variable = self.dense_plot_bool, state='disabled')
 		self.nodes_cbutton = ttk.Checkbutton(variable = self.nodes_plot_bool, state='disabled')
-		self.scar_cbutton.grid(row=10, column=1, sticky='W')
-		self.dense_cbutton.grid(row=11, column=1, sticky='W')
-		self.nodes_cbutton.grid(row=9, column=1, sticky='W')
+		self.scar_cbutton.grid(row=11, column=1, sticky='W')
+		self.dense_cbutton.grid(row=12, column=1, sticky='W')
+		self.nodes_cbutton.grid(row=10, column=1, sticky='W')
 		#	Buttons to plot MRI Models or Meshes
 		self.plot_mri_button = ttk.Button(text='Plot MRI Model', command= lambda: self.plotMRIModel(), state='disabled')
 		self.plot_mesh_button = ttk.Button(text='Plot MRI Mesh', command= lambda: self.plotMRIMesh(), state='disabled')
-		self.plot_mri_button.grid(row=13, column=0, sticky='W')
-		self.plot_mesh_button.grid(row=13, column=1, sticky='W')
+		self.plot_mri_button.grid(row=14, column=0, sticky='W')
+		self.plot_mesh_button.grid(row=14, column=1, sticky='W')
 		
 		# Separators
-		ttk.Separator(orient='vertical').grid(column=9, row=0, rowspan=14, sticky='NS')
-		ttk.Separator(orient='horizontal').grid(column=0, row=8, columnspan=9, sticky='EW')
-		ttk.Separator(orient='vertical').grid(row=8, column=1, rowspan=6, sticky='NSE')
-		
-		# Progress indicator labels
-		self.progLabel = ttk.Label(text='Ready')
-		self.progLabel.grid(row=6, column=0, columnspan=8)
+		ttk.Separator(orient='vertical').grid(column=9, row=0, rowspan=15, sticky='NS')
+		ttk.Separator(orient='horizontal').grid(column=0, row=9, columnspan=9, sticky='EW')
+		ttk.Separator(orient='vertical').grid(row=9, column=1, rowspan=6, sticky='NSE')
 		
 		# Set specific label fonts
 		f = font.Font(mesh_label, mesh_label.cget('font'))
@@ -219,7 +232,7 @@ class modelGUI(tk.Frame):
 		entry_box.insert(0, file_name)
 		return(file_name)
 		
-	def createMRIModel(self, sa_filename, la_filename, lge_filename, dense_filenames):
+	def createMRIModel(self, sa_filename, la_filename, lge_filename, la_lge_filenames, dense_filenames):
 		"""Function run to instantiate MRI model based on input files.
 		"""
 		# Check that required files are present
@@ -231,29 +244,26 @@ class modelGUI(tk.Frame):
 			return(False)
 		
 		# Parse DENSE Filenames
-		self.progLabel['text'] = 'Generating MRI Model'
 		if not(dense_filenames.get() == ''):
-			dense_filenames_parsed = dense_filenames.get().split('} {')
-			list_replacements = {ord('{') : None, ord('}') : None}
-			dense_filenames_replaced = [temp_str.translate(list_replacements) for temp_str in dense_filenames_parsed]
+			dense_filenames_replaced = list(self.master.tk.splitlist(dense_filenames.get()))
 		else:
 			dense_filenames_replaced = dense_filenames.get()
+			
+		if not(la_lge_filenames.get() == ''):
+			la_lge_filenames_replaced = list(self.master.tk.splitlist(la_lge_filenames.get()))
+		else:
+			la_lge_filenames_replaced = la_lge_filenames.get()
 		
 		# Instantiate MRI model object and import cine stack (at default timepoint)
-		self.mri_model = mrimodel.MRIModel(sa_filename.get(), la_filename.get(), sa_scar_file=lge_filename.get(), dense_file=dense_filenames_replaced)
-		self.progLabel['text'] = 'Importing Cine Stack'
+		self.mri_model = mrimodel.MRIModel(sa_filename.get(), la_filename.get(), sa_scar_file=lge_filename.get(), la_scar_files=la_lge_filenames_replaced, dense_file=dense_filenames_replaced)
 		self.mri_model.importCine(timepoint=0)
 		
 		# Import LGE, if included, and generate full alignment array
 		if self.mri_model.scar:
 			self.scar_cbutton.configure(state='normal')
-			self.progLabel['text'] = 'Importing Scar Stack'
 			self.mri_model.importLGE()
-			# Run scar alignment for all timepoints at start, to store before use
-			with warnings.catch_warnings():
-				warnings.simplefilter('ignore')
-				for i in range(len(self.mri_model.cine_endo)):
-					self.mri_model.alignScarCine(timepoint=i)
+			if not(la_lge_filenames_replaced == ''):
+				self.mri_model.importScarLA()
 		else:
 			# Only occurs if scar is removed from MRI model on later instantiation
 			self.scar_cbutton.configure(state='disabled')
@@ -262,7 +272,6 @@ class modelGUI(tk.Frame):
 		# Import DENSE, if included
 		if self.mri_model.dense:
 			self.dense_cbutton.configure(state='normal')
-			self.progLabel['text'] = 'Importing DENSE Stack'
 			self.mri_model.importDense()
 			self.mri_model.alignDense(cine_timepoint=0)
 			self.dense_timepoint_cbox.configure(values=list(range(len(self.mri_model.dense_aligned_displacement))), state='readonly')
@@ -276,10 +285,15 @@ class modelGUI(tk.Frame):
 		# Update GUI elements
 		self.cine_timepoint_cbox.configure(values=list(range(len(self.mri_model.cine_endo))), state='readonly')
 		self.cine_timepoint_cbox.current(0)
-		self.progLabel['text'] = 'MRI Model Generated Successfully'
-		self.meshButton.configure(state='normal', text='Generate MRI Mesh')
-
-	def createMRIMesh(self, num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox):
+		if not self.mri_mesh:
+			self.meshButton.configure(state='normal', text='Generate MRI Mesh')
+		else:
+			if self.mri_model.scar:
+				self.scar_fe_button.configure(state='enabled')
+			if self.mri_model.dense:
+				self.dense_fe_button.configure(state='enabled')
+		
+	def createMRIMesh(self, num_rings_entry, elem_per_ring_entry, elem_thru_wall_entry, mesh_type_cbox=False, premade_mesh_file=False):
 		"""Function to generate base-level mesh from MRI model object
 		"""
 		# Pull variables from GUI entry fields
@@ -290,31 +304,50 @@ class modelGUI(tk.Frame):
 		else:
 			messagebox.showinfo('Mesh Settings', 'Mesh option left blank. Correct and try again.')
 			return(False)
-		time_point = int(self.cine_timepoint_cbox.get())
+			
+		if mesh_type_cbox:
+			time_point = int(self.cine_timepoint_cbox.get())
 		
-		# Create base mesh
-		self.mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
+			# Create base mesh
+			self.mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
 		
-		# Fit mesh to MRI model data
-		self.mri_mesh.fitContours(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, mesh_type_cbox.get())
-		self.mri_mesh.feMeshRender()
-		self.mri_mesh.nodeNum(self.mri_mesh.meshCart[0], self.mri_mesh.meshCart[1], self.mri_mesh.meshCart[2])
-		self.mri_mesh.getElemConMatrix()
-		
-		# Update GUI elements as needed
-		self.plot_mri_button.configure(state='normal')
-		self.plot_mesh_button.configure(state='normal')
-		self.feb_file_button.configure(state='normal')
-		self.nodes_cbutton.configure(state='normal')
-		self.conn_mat_cbox.configure(state='readonly')
-		if self.mri_model.scar:
-			self.scar_fe_button.configure(state='normal')
-		else:
-			self.scar_fe_button.configure(state='disabled')
-		if self.mri_model.dense:
-			self.dense_fe_button.configure(state='normal')
-		else:
-			self.dense_fe_button.configure(state='disabled')
+			# Fit mesh to MRI model data
+			self.mri_mesh.fitContours(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, mesh_type_cbox.get())
+			self.mri_mesh.feMeshRender()
+			self.mri_mesh.nodeNum(self.mri_mesh.meshCart[0], self.mri_mesh.meshCart[1], self.mri_mesh.meshCart[2])
+			self.mri_mesh.getElemConMatrix()
+			# Update GUI elements as needed
+			self.plot_mri_button.configure(state='normal')
+			self.plot_mesh_button.configure(state='normal')
+			self.feb_file_button.configure(state='normal')
+			self.nodes_cbutton.configure(state='normal')
+			self.conn_mat_cbox.configure(state='readonly')
+			if self.mri_model.scar:
+				self.scar_fe_button.configure(state='normal')
+			else:
+				self.scar_fe_button.configure(state='disabled')
+			if self.mri_model.dense:
+				self.dense_fe_button.configure(state='normal')
+			else:
+				self.dense_fe_button.configure(state='disabled')
+		elif premade_mesh_file:
+			self.mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
+			self.mri_mesh.importPremadeMesh(premade_mesh_file.get())
+			# Update GUI elements as needed
+			self.plot_mri_button.configure(state='normal')
+			self.plot_mesh_button.configure(state='normal')
+			self.feb_file_button.configure(state='normal')
+			self.nodes_cbutton.configure(state='normal')
+			self.meshButton.configure(state='disabled', text='Using Premade Mesh')
+			if self.mri_model:
+				if self.mri_model.scar:
+					self.scar_fe_button.configure(state='normal')
+				else:
+					self.scar_fe_button.configure(state='disabled')
+				if self.mri_model.dense:
+					self.dense_fe_button.configure(state='normal')
+				else:
+					self.dense_fe_button.configure(state='disabled')
 	
 	def createConfocalModel(self, confocal_dir_entry):
 		confocal_dir = confocal_dir_entry.get()
@@ -332,18 +365,15 @@ class modelGUI(tk.Frame):
 		"""Function to respond to timepoint adjustments in the base cine mesh / model
 		"""
 		# Insure timepoint is an integer (should always succeed, in place for possible errors)
-		self.progLabel.configure(text='Updating timepoint in model.')
 		try:
 			new_timepoint = int(self.cine_timepoint_cbox.get())
 		except:
-			self.progLabel.configure(text='Timepoint selection failed. Probably a NaN timepoint.')
 			return(False)
 		# Import the cine model at the selected timepoint (updates landmarks)
 		self.mri_model.importCine(timepoint = new_timepoint)
 		# If necessary, align DENSE to new cine timepoint (most important aspect)
 		if self.mri_model.dense:
 			self.mri_model.alignDense(cine_timepoint = new_timepoint)
-		self.progLabel.configure(text='Timepoint successfully updated!')
 	
 	def plotMRIModel(self):
 		"""Plots MRI Model based on raw data (slice contours, scar traces, etc.)
@@ -379,7 +409,10 @@ class modelGUI(tk.Frame):
 		"""Requests mesh to process which elements are in scar
 		"""
 		time_point = int(self.cine_timepoint_cbox.get())
-		self.mri_mesh.assignScarElems(self.mri_model.aligned_scar[time_point], conn_mat = self.conn_mat_cbox.get())
+		self.mri_model.convertDataProlate(self.mri_mesh.focus)
+		self.mri_mesh.rotateNodesProlate()
+		self.mri_model.alignScar()
+		self.mri_mesh.interpScarData(self.mri_model.interp_data)
 		if not self.scar_assign:
 			self.scar_assign = True
 		if self.dense_assign and self.scar_assign:
@@ -459,7 +492,6 @@ class modelGUI(tk.Frame):
 			channels[slice_num] = self.confocal_model.getChannelList(cur_slice)
 		self._createSubsliceWindow(stitch_slices, sub_slices, channels)
 		return(True)
-		#self.confocal_model.generateStitchedImages(slices=stitch_slices, sub_slices = [0, 9, 16])
 	
 	def intValidate(self, new_value):
 		"""Simple validation function to ensure an entry receives only int-able inputs or null
