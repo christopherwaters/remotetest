@@ -83,6 +83,25 @@ class Mesh():
 		self.num_rings, self.elem_per_ring, self.elem_in_wall = lv_geom['LVLCR']
 		self.epi_node_list = np.subtract(lv_geom['eEPI'], 1)
 		self.epi_nodes = self.hex[self.epi_node_list, :][:, [2, 3, 6, 7]]
+		return(True)
+	
+	def assignInsertionPts(self, apex_pt, basal_pt, septal_pts):
+		calcNorm = lambda arr_in: np.sqrt(np.sum(np.square(arr_in)))
+		
+		c = apex_pt - basal_pt
+		c_norm = calcNorm(c)
+		self.origin = basal_pt + c/3
+		e1_basis = [c1 / c_norm for c1 in c]
+		
+		d1 = septal_pts[0, :] - self.origin
+		d2 = d1 - [np.dot(d1, e1_basis)*e1_elem for e1_elem in e1_basis]
+		e2_basis = d2 / calcNorm(d2)
+		
+		e3 = np.cross(e1_basis, e2_basis)
+		e3_basis = e3 / calcNorm(e3)
+		
+		self.transform = np.array([e1_basis, e2_basis, e3_basis])
+		return(True)
 	
 	def rotateNodesProlate(self):
 		nodes_prol_list = mathhelper.cart2prolate(self.nodes[:, 0], self.nodes[:, 1], self.nodes[:, 2], self.focus)
@@ -104,7 +123,9 @@ class Mesh():
 		"""
 		
 		# Set up variables
-		data_endo, data_epi, self.focus, self.transform, self.origin = stackhelper.rotateDataCoordinates(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts)
+		print(all_data_endo[0].shape)
+		data_endo, self.focus, self.transform, self.origin = stackhelper.rotateDataCoordinates(all_data_endo, apex_pt, basal_pt, septal_pts)
+		data_epi = stackhelper.rotateDataCoordinates(all_data_epi, apex_pt, basal_pt, septal_pts)[0]
 		
 		# Fit using a bicubic interpolation.
 		self.endo_node_matrix, _ = meshhelper.fitBicubicData(data_endo, self.focus, mesh_density=mesh_type)

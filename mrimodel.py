@@ -195,7 +195,9 @@ class MRIModel():
 			cine_epi_alltime[i] = cine_epi
 		'''
 		# Store class fields based on calculated values:
-		#self.cine_apex_pt = abs_shifted[0]
+		self.cine_apex_pt = self.abs_pts_rot[0]
+		self.cine_basal_pt = self.abs_pts_rot[1]
+		self.cine_septal_pts = self.rv_insertion_pts_rot
 		#self.cine_basal_pt = abs_shifted[1]
 		#self.cine_septal_pts = abs_shifted[2:]
 		#self.cine_endo = cine_endo_alltime

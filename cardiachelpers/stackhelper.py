@@ -22,6 +22,10 @@ def rotateDataCoordinates(points, apex_pt, basal_pt, septal_pts):
 	"""
 	#endo = all_data_endo[:, 0:3]
 	#epi = all_data_epi[:, 0:3]
+	points = np.array(points)
+	apex_pt = np.array(apex_pt)
+	basal_pt = np.array(basal_pt)
+	septal_pts = np.array(septal_pts)
 	
 	calcNorm = lambda arr_in: np.sqrt(np.sum(np.square(arr_in)))
 	
@@ -51,6 +55,7 @@ def rotateDataCoordinates(points, apex_pt, basal_pt, septal_pts):
 	transform_basis = np.array([e1_basis, e2_basis, e3_basis])
 	
 	# Set up the modified endo and epi contours
+	#print(points)
 	rot_points = np.dot((points - np.array([origin for i in range(num_points)])), np.transpose(transform_basis))
 	#data_epi = np.dot((epi - np.array([origin for i in range(epi_points)])), np.transpose(transform_basis))
 	

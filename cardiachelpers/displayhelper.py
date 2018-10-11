@@ -4,6 +4,7 @@ import matplotlib.pyplot as mplt
 from mpl_toolkits.mplot3d import Axes3D
 from cardiachelpers import meshhelper
 from cardiachelpers import mathhelper
+from cardiachelpers import stackhelper
 import subprocess
 
 def segmentRender(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, origin, transform, landmarks=True, ax=None, scar=None):
@@ -23,7 +24,10 @@ def segmentRender(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, or
 	if not ax:
 		fig = mplt.figure()
 		ax = fig.add_subplot(111, projection='3d')
-	data_endo, data_epi, _, _, _ = meshhelper.prepData(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts)
+	all_data_endo = np.array(all_data_endo).squeeze()
+	all_data_epi = np.array(all_data_epi).squeeze()
+	data_endo = stackhelper.rotateDataCoordinates(all_data_endo, apex_pt, basal_pt, septal_pts)[0]
+	data_epi = stackhelper.rotateDataCoordinates(all_data_epi, apex_pt, basal_pt, septal_pts)[0]
 	# Subtract origin and transform data
 	apex_transform = np.dot((apex_pt - origin), np.transpose(transform))
 	basal_transform = np.dot((basal_pt - origin), np.transpose(transform))
@@ -71,6 +75,7 @@ def surfaceRender(nodal_mesh, focus, ax=None):
 		fig = mplt.figure()
 		ax = fig.add_subplot(111, projection='3d')
 
+	print(type(nodal_mesh))
 	# Sort the mesh by first 3 columns
 	nodal_mesh = nodal_mesh[nodal_mesh[:, 0].argsort()]
 	nodal_mesh = nodal_mesh[nodal_mesh[:, 1].argsort(kind='mergesort')]

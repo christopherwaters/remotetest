@@ -288,6 +288,7 @@ class modelGUI(tk.Frame):
 		if not self.mri_mesh:
 			self.meshButton.configure(state='normal', text='Generate MRI Mesh')
 		else:
+			self.mri_mesh.assignInsertionPts(self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts)
 			if self.mri_model.scar:
 				self.scar_fe_button.configure(state='enabled')
 			if self.mri_model.dense:
@@ -340,6 +341,7 @@ class modelGUI(tk.Frame):
 			self.nodes_cbutton.configure(state='normal')
 			self.meshButton.configure(state='disabled', text='Using Premade Mesh')
 			if self.mri_model:
+				self.mri_mesh.assignInsertionPts(self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts)
 				if self.mri_model.scar:
 					self.scar_fe_button.configure(state='normal')
 				else:
