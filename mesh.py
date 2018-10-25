@@ -440,15 +440,15 @@ class Mesh():
 			
 		return(elem_displacements_x, elem_displacements_y)
 	
-	def interpScarData(self, interp_data):
+	def interpScarData(self, interp_data, trans_smooth=0, depth_smooth=0):
 		non_nan_inds = ~np.isnan(interp_data[:, 3])
 		epi_nodes = self.nodes[self.epi_nodes, :]
 		epi_nodes_list = [epi_nodes[:, i, :] for i in range(epi_nodes.shape[1])]
 		epi_nodes_formatted = np.vstack(tuple(epi_nodes_list))
 		_, m_epi, t_epi = mathhelper.cart2prolate(epi_nodes_formatted[:, 0], epi_nodes_formatted[:, 1], epi_nodes_formatted[:, 2], self.focus)
 		
-		transmurality_rbf = sp.interpolate.Rbf(interp_data[:, 0], interp_data[:, 1], interp_data[:, 2], function='linear', smooth=0)
-		depth_rbf = sp.interpolate.Rbf(interp_data[non_nan_inds, 0], interp_data[non_nan_inds, 1], interp_data[non_nan_inds, 3], function='linear', smooth=0)
+		transmurality_rbf = sp.interpolate.Rbf(interp_data[:, 0], interp_data[:, 1], interp_data[:, 2], function='linear', smooth=trans_smooth)
+		depth_rbf = sp.interpolate.Rbf(interp_data[non_nan_inds, 0], interp_data[non_nan_inds, 1], interp_data[non_nan_inds, 3], function='linear', smooth=depth_smooth)
 		
 		scar_tr = transmurality_rbf(t_epi, m_epi)
 		scar_dp = depth_rbf(t_epi, m_epi)
