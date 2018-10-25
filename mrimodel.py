@@ -127,7 +127,7 @@ class MRIModel():
 			# Store slice data by timepoint
 			endo_by_timept[i] = [endo[slice][cur_endo_timept[slice]] for slice in range(len(endo))]
 			epi_by_timept[i] = [epi[slice][cur_epi_timept[slice]] for slice in range(len(epi))]
-		
+
 		# Convert endo and epi to polar, store by timepoint
 		endo_polar_alltime = [None] * len(endo_by_timept)
 		epi_polar_alltime = [None] * len(epi_by_timept)
@@ -146,7 +146,7 @@ class MRIModel():
 			wall_thickness_alltime[i] = wall_thickness
 		
 			# Retranslate results to cartesian from polar and shift:
-			cine_endo, cine_epi = stackhelper.shiftPolarCartesian(endo_polar, epi_polar, endo_by_timept[1], epi_by_timept[1], kept_slices, axis_center, wall_thickness)
+			cine_endo, cine_epi = stackhelper.shiftPolarCartesian(endo_polar, epi_polar, endo_by_timept[i], epi_by_timept[i], kept_slices, axis_center, wall_thickness)
 			cine_endo_alltime[i] = cine_endo
 			cine_epi_alltime[i] = cine_epi
 		
