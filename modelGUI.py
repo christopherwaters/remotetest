@@ -459,7 +459,6 @@ class modelGUI(tk.Frame):
 			channels[slice_num] = self.confocal_model.getChannelList(cur_slice)
 		self._createSubsliceWindow(stitch_slices, sub_slices, channels)
 		return(True)
-		#self.confocal_model.generateStitchedImages(slices=stitch_slices, sub_slices = [0, 9, 16])
 	
 	def intValidate(self, new_value):
 		"""Simple validation function to ensure an entry receives only int-able inputs or null
@@ -531,9 +530,6 @@ class modelGUI(tk.Frame):
 		frame_height = np.min([int(screen_height * 3 / 4), slice_frame.winfo_height()])
 		
 		slice_canvas.config(width = slice_frame.winfo_width(), height=frame_height)
-		
-		#self.slice_menu.update()
-		#print(frame_height)
 		
 	def _stitchSlices(self, slice_list):
 		"""Actually iterate through and run the stitching process for each item selected by the user.
