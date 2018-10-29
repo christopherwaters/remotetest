@@ -35,12 +35,10 @@ mri_model.convertDataProlate(mri_mesh.focus)
 mri_mesh.rotateNodesProlate()
 
 mri_model.alignScar()
-depth_smooth_list = [0.05*i for i in range(21)]
-trans_smooth_list = [0.05*i for i in range(21)]
-scar_elem_list = [None]*(len(depth_smooth_list)*len(trans_smooth_list))
+depth_smooth_list = [0.05*i for i in range(101)]
+scar_elem_list = [None]*len(depth_smooth_list)
 for depth_i, depth_smooth in enumerate(depth_smooth_list):
-	for trans_i, trans_smooth in enumerate(trans_smooth_list):
-		scar_elem_list[depth_i*21+trans_i] = mri_mesh.interpScarData(mri_model.interp_data, trans_smooth, depth_smooth)
+	scar_elem_list[depth_i] = mri_mesh.interpScarData(mri_model.interp_data, depth_smooth=depth_smooth)
 
 '''
 mri_model = mrimodel.MRIModel(sa_filename, la_filename, scar_file=lge_filename)
