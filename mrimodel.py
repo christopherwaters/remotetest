@@ -123,18 +123,7 @@ class MRIModel():
 		time_pts = np.unique(endo_stack[:, 3])
 		endo = [None]*time_pts.size
 		epi = [None]*time_pts.size
-		'''
-		for i, slice_num in enumerate(kept_slices):
-			endo_by_slice = endo_stack[np.where(endo_stack[:, 4] == slice_num)[0], :4]
-			epi_by_slice = epi_stack[np.where(epi_stack[:, 4] == slice_num)[0], :4]
-			endo_slice_by_time = [None]*len(time_pts)
-			epi_slice_by_time = [None]*len(time_pts)
-			for j, time_pt in enumerate(time_pts):
-				endo_slice_by_time[j] = endo_by_slice[np.where(endo_by_slice[:, 3] == time_pt)[0], :3]
-				epi_slice_by_time[j] = epi_by_slice[np.where(epi_by_slice[:, 3] == time_pt)[0], :3]
-			endo[i] = endo_slice_by_time
-			epi[i] = epi_slice_by_time
-		'''
+
 		for i, time_pt in enumerate(time_pts):
 			endo_by_time = endo_stack[np.where(endo_stack[:, 3] == time_pt)[0], :]
 			epi_by_time = epi_stack[np.where(epi_stack[:, 3] == time_pt)[0], :]
@@ -162,58 +151,11 @@ class MRIModel():
 			self.cine_epi_rotate[time_pt] = epi_rotate_timepts
 		self.rv_insertion_pts_rot = stackhelper.rotateDataCoordinates(self.rv_insertion_pts, apex_pt, base_pt, center_septal_pt)[0]
 		self.abs_pts_rot = stackhelper.rotateDataCoordinates(self.apex_base_pts, apex_pt, base_pt, center_septal_pt)[0]
-		# Get the adjusted contours from the stacks
-		'''
-		abs_shifted, endo, epi, axis_center = stackhelper.getContourFromStack(endo_stack, epi_stack, sastruct, self.rv_insertion_pts, septal_slice, self.apex_base_pts)
-		
-		# Sort endo and epi traces by timepoint
-		#	Pull time points from stack traces, then generate lists to store indices
-		endo_time_pts = endo_stack[:, 3]
-		epi_time_pts = epi_stack[:, 3]
-		endo_by_timept = [None] * np.unique(endo_time_pts).shape[0]
-		epi_by_timept = [None] * np.unique(epi_time_pts).shape[0]
-		# Iterate through time points
-		for i in range(len(endo_by_timept)):
-			# Get time points in sorted order
-			time_pt = np.unique(endo_time_pts)[i]
-			# Get indices per-slice, by selected timepoint
-			cur_endo_timept = importhelper.getTimeIndices(endo, endo_time_pts, time_pt)
-			cur_epi_timept = importhelper.getTimeIndices(epi, epi_time_pts, time_pt)
-			# Store slice data by timepoint
-			endo_by_timept[i] = [endo[slice][cur_endo_timept[slice]] for slice in range(len(endo))]
-			epi_by_timept[i] = [epi[slice][cur_epi_timept[slice]] for slice in range(len(epi))]
-		
-		# Convert endo and epi to polar, store by timepoint
-		endo_polar_alltime = [None] * len(endo_by_timept)
-		epi_polar_alltime = [None] * len(epi_by_timept)
-		wall_thickness_alltime = [None] * len(endo_by_timept)
-		cine_endo_alltime = [None] * len(endo_by_timept)
-		cine_epi_alltime = [None] * len(epi_by_timept)
-		# Iterate through time points
-		for i in range(len(endo_by_timept)):
-			# Get polar endo and epi for the selected timepoint
-			endo_polar, epi_polar, _ = stackhelper.convertSlicesToPolar(kept_slices, endo_by_timept[i], epi_by_timept[i])
-			endo_polar_alltime[i] = endo_polar
-			epi_polar_alltime[i] = epi_polar
-		
-			# Calculate Wall Thickness based on the difference between epi and endo polar radii
-			wall_thickness = np.append(np.expand_dims(endo_polar[:, :, 1], axis=2), np.expand_dims(epi_polar[:, :, 3] - endo_polar[:, :, 3], axis=2), axis=2)
-			wall_thickness_alltime[i] = wall_thickness
-		
-			# Retranslate results to cartesian from polar and shift:
-			cine_endo, cine_epi = stackhelper.shiftPolarCartesian(endo_polar, epi_polar, endo_by_timept[i], epi_by_timept[i], kept_slices, axis_center, wall_thickness)
-			cine_endo_alltime[i] = cine_endo
-			cine_epi_alltime[i] = cine_epi
-		'''
+
 		# Store class fields based on calculated values:
 		self.cine_apex_pt = self.abs_pts_rot[0]
 		self.cine_basal_pt = self.abs_pts_rot[1]
 		self.cine_septal_pts = self.rv_insertion_pts_rot
-		#self.cine_basal_pt = abs_shifted[1]
-		#self.cine_septal_pts = abs_shifted[2:]
-		#self.cine_endo = cine_endo_alltime
-		#self.cine_epi = cine_epi_alltime
-		#self.cine_slices = kept_slices
 
 		return(True)
 		
