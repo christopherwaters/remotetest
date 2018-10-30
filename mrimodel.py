@@ -120,10 +120,10 @@ class MRIModel():
 		base_pt = self.apex_base_pts[1, :]
 		center_septal_pt = np.expand_dims(self.rv_insertion_pts[2, :], 0)
 		
-		endo = [None]*len(kept_slices)
-		epi = [None]*len(kept_slices)
 		time_pts = np.unique(endo_stack[:, 3])
-		
+		endo = [None]*time_pts.size
+		epi = [None]*time_pts.size
+		'''
 		for i, slice_num in enumerate(kept_slices):
 			endo_by_slice = endo_stack[np.where(endo_stack[:, 4] == slice_num)[0], :4]
 			epi_by_slice = epi_stack[np.where(epi_stack[:, 4] == slice_num)[0], :4]
@@ -134,21 +134,32 @@ class MRIModel():
 				epi_slice_by_time[j] = epi_by_slice[np.where(epi_by_slice[:, 3] == time_pt)[0], :3]
 			endo[i] = endo_slice_by_time
 			epi[i] = epi_slice_by_time
-		
+		'''
+		for i, time_pt in enumerate(time_pts):
+			endo_by_time = endo_stack[np.where(endo_stack[:, 3] == time_pt)[0], :]
+			epi_by_time = epi_stack[np.where(epi_stack[:, 3] == time_pt)[0], :]
+			endo_time_by_slice = [None]*len(kept_slices)
+			epi_time_by_slice = [None]*len(kept_slices)
+			for j, slice_num in enumerate(kept_slices):
+				endo_time_by_slice[j] = endo_by_time[np.where(endo_by_time[:, 4] == slice_num)[0], :3]
+				epi_time_by_slice[j] = epi_by_time[np.where(epi_by_time[:, 4] == slice_num)[0], :3]
+			endo[i] = endo_time_by_slice
+			epi[i] = epi_time_by_slice
+
 		self.cine_endo = endo
 		self.cine_epi = epi
 		
 		self.cine_endo_rotate = [None]*len(self.cine_endo)
 		self.cine_epi_rotate = [None]*len(self.cine_epi)
 		
-		for slice_num in range(len(self.cine_endo_rotate)):
-			endo_rotate_timepts = [None]*len(self.cine_endo[slice_num])
-			epi_rotate_timepts = [None]*len(self.cine_epi[slice_num])
-			for time_pt in range(len(endo_rotate_timepts)):
-				endo_rotate_timepts[time_pt], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(endo[slice_num][time_pt], apex_pt, base_pt, center_septal_pt)
-				epi_rotate_timepts[time_pt], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(epi[slice_num][time_pt], apex_pt, base_pt, center_septal_pt)
-			self.cine_endo_rotate[slice_num] = endo_rotate_timepts
-			self.cine_epi_rotate[slice_num] = epi_rotate_timepts
+		for time_pt in range(len(self.cine_endo_rotate)):
+			endo_rotate_timepts = [None]*len(self.cine_endo[time_pt])
+			epi_rotate_timepts = [None]*len(self.cine_epi[time_pt])
+			for slice_num in range(len(endo_rotate_timepts)):
+				endo_rotate_timepts[slice_num], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(endo[time_pt][slice_num], apex_pt, base_pt, center_septal_pt)
+				epi_rotate_timepts[slice_num], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(epi[time_pt][slice_num], apex_pt, base_pt, center_septal_pt)
+			self.cine_endo_rotate[time_pt] = endo_rotate_timepts
+			self.cine_epi_rotate[time_pt] = epi_rotate_timepts
 		self.rv_insertion_pts_rot = stackhelper.rotateDataCoordinates(self.rv_insertion_pts, apex_pt, base_pt, center_septal_pt)[0]
 		self.abs_pts_rot = stackhelper.rotateDataCoordinates(self.apex_base_pts, apex_pt, base_pt, center_septal_pt)[0]
 		# Get the adjusted contours from the stacks

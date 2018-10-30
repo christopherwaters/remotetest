@@ -75,7 +75,6 @@ def surfaceRender(nodal_mesh, focus, ax=None):
 		fig = mplt.figure()
 		ax = fig.add_subplot(111, projection='3d')
 
-	print(type(nodal_mesh))
 	# Sort the mesh by first 3 columns
 	nodal_mesh = nodal_mesh[nodal_mesh[:, 0].argsort()]
 	nodal_mesh = nodal_mesh[nodal_mesh[:, 1].argsort(kind='mergesort')]
