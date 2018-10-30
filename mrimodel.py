@@ -159,8 +159,8 @@ class MRIModel():
 		
 		#print(cine_endo_arrs[0])
 		# Store class fields based on calculated values:
-		self.cine_endo = endo
-		self.cine_epi = epi
+		self.cine_endo = cine_endo_arrs
+		self.cine_epi = cine_epi_arrs
 		self.cine_apex_pt = self.abs_pts_rot[0]
 		self.cine_basal_pt = self.abs_pts_rot[1]
 		self.cine_septal_pts = self.rv_insertion_pts_rot
