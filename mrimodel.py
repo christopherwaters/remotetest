@@ -134,16 +134,13 @@ class MRIModel():
 				epi_time_by_slice[j] = epi_by_time[np.where(epi_by_time[:, 4] == slice_num)[0], :3]
 			endo[i] = endo_time_by_slice
 			epi[i] = epi_time_by_slice
-
-		self.cine_endo = endo
-		self.cine_epi = epi
 		
-		self.cine_endo_rotate = [None]*len(self.cine_endo)
-		self.cine_epi_rotate = [None]*len(self.cine_epi)
+		self.cine_endo_rotate = [None]*len(endo)
+		self.cine_epi_rotate = [None]*len(epi)
 		
 		for time_pt in range(len(self.cine_endo_rotate)):
-			endo_rotate_timepts = [None]*len(self.cine_endo[time_pt])
-			epi_rotate_timepts = [None]*len(self.cine_epi[time_pt])
+			endo_rotate_timepts = [None]*len(endo[time_pt])
+			epi_rotate_timepts = [None]*len(epi[time_pt])
 			for slice_num in range(len(endo_rotate_timepts)):
 				endo_rotate_timepts[slice_num], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(endo[time_pt][slice_num], apex_pt, base_pt, center_septal_pt)
 				epi_rotate_timepts[slice_num], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(epi[time_pt][slice_num], apex_pt, base_pt, center_septal_pt)
@@ -152,7 +149,18 @@ class MRIModel():
 		self.rv_insertion_pts_rot = stackhelper.rotateDataCoordinates(self.rv_insertion_pts, apex_pt, base_pt, center_septal_pt)[0]
 		self.abs_pts_rot = stackhelper.rotateDataCoordinates(self.apex_base_pts, apex_pt, base_pt, center_septal_pt)[0]
 
+		cine_endo_arrs = [None]*len(endo)
+		cine_epi_arrs = [None]*len(epi)
+		
+		for time_ind, endo_timept in enumerate(endo):
+			epi_timept = epi[time_ind]
+			cine_endo_arrs[time_ind] = np.vstack(endo_timept)
+			cine_epi_arrs[time_ind] = np.vstack(epi_timept)
+		
+		print(cine_endo_arrs[0])
 		# Store class fields based on calculated values:
+		self.cine_endo = endo
+		self.cine_epi = epi
 		self.cine_apex_pt = self.abs_pts_rot[0]
 		self.cine_basal_pt = self.abs_pts_rot[1]
 		self.cine_septal_pts = self.rv_insertion_pts_rot
