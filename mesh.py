@@ -123,7 +123,7 @@ class Mesh():
 		"""
 		
 		# Set up variables
-		print(len(all_data_endo))
+		print([all_data_endo_i.shape for all_data_endo_i in all_data_endo])
 		data_endo, self.focus, self.transform, self.origin = stackhelper.rotateDataCoordinates(all_data_endo, apex_pt, basal_pt, septal_pts)
 		data_epi = stackhelper.rotateDataCoordinates(all_data_epi, apex_pt, basal_pt, septal_pts)[0]
 		

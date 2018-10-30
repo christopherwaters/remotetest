@@ -157,7 +157,7 @@ class MRIModel():
 			cine_endo_arrs[time_ind] = np.vstack(endo_timept)
 			cine_epi_arrs[time_ind] = np.vstack(epi_timept)
 		
-		print(cine_endo_arrs[0])
+		#print(cine_endo_arrs[0])
 		# Store class fields based on calculated values:
 		self.cine_endo = endo
 		self.cine_epi = epi
