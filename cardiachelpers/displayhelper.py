@@ -40,6 +40,7 @@ def segmentRender(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, or
 		# Get the indices that match the current bin and append then append the first value
 		tracing = np.where(all_data_endo[:, 2] == bins[jz])[0]
 		tracing = np.append(tracing, tracing[0])
+		print(tracing)
 		# Pull x, y, z from endo and epi and plot
 		x = data_endo[tracing, 2]
 		y = data_endo[tracing, 1]
