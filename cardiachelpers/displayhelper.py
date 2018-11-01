@@ -250,7 +250,7 @@ def nodeRender(nodes, ax=None):
 def displayMeshPostview(file_name):
 	"""Launch PostView with specific file selected.
 	"""
-	p = subprocess.Popen(['C://Program Files/postview-2.1.0/PostView2.exe', file_name])
+	p = subprocess.Popen(['C://Program Files/postview-2.3/PostView2.exe', file_name])
 	return(p)
 	
 def plotListData(input_list, title_list, ax=None):
