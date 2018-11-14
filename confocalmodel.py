@@ -56,7 +56,11 @@ class ConfocalModel():
 					self.slices[slice_num].createStitchedImage(overlap=overlap, compress_ratio=compress_ratio, frame=sub_slice, stitched_file=file_name, force_file=force_file)
 				else:	
 					print('Image already exists! No need to overwrite.')
-					
+		
+	def generateImageGridFiles(self, slices):
+		for slice_ind, slice_num in enumerate(slices):
+			self.slices[slice_num].createImageGridFile()
+		
 	def getSubsliceList(self, top_slice):
 		"""Gather information about which sub-slices are present within each image.
 		"""
@@ -91,7 +95,7 @@ class ConfocalSlice():
 		self.slice_name = os.path.split(confocal_dir)[1]
 		
 		# Record filenames for all tiff image files in the directory.
-		self.tif_files = glob.glob(os.path.join(confocal_dir, '*.tif')).copy()
+		self.tif_files = sorted(glob.glob(os.path.join(confocal_dir, '*.tif')).copy())
 		self.raw_images = [None]*len(self.tif_files)
 		
 		# Iterate through and create image objects for each tiff file
@@ -146,3 +150,8 @@ class ConfocalSlice():
 
 		# Pass the compressed images, image grid information, and stitched file to save to the image stitching function
 		stitched_success = confocalhelper.stitchImages(self.compressed_images[frame], self.im_grid[:, 0], self.im_grid[:, 1], save_pos=stitched_file, stitched_type='F')
+		
+	def createImageGridFile(self):
+		im_locs, im_locs_dict = confocalhelper.getImagePositions(self.tif_files)
+		im_grid = confocalhelper.getImageGrid(self.tif_files, im_locs, im_locs_dict)
+		confocalhelper.writeImageGrid(im_grid, self.image_grid_file)

@@ -558,6 +558,7 @@ class modelGUI(tk.Frame):
 				
 		farthest_column, lowest_row = slice_frame.grid_size()
 		ttk.Button(slice_frame, text='Generate Stitched Image', command= lambda: self._stitchSlices(slice_list)).grid(row=lowest_row, column=math.ceil(farthest_column/2)-1, columnspan=2-(farthest_column % 2))
+		ttk.Button(slice_frame, text='Genereate Stitch Files', command= lambda: self._generateStitchFiles(slice_list)).grid(row=lowest_row+1, column=math.ceil(farthest_column/2)-1, columnspan=2-(farthest_column % 2))
 		
 		# Update and resize the canvas to match the frame
 		slice_frame.update()
@@ -572,7 +573,10 @@ class modelGUI(tk.Frame):
 		"""
 		subslice_list, channel_list = self.__getSubsChannels(slice_list)
 		self.confocal_model.generateStitchedImages(slice_list, subslice_list, compress_ratio=1)
-		
+	
+	def _generateStitchFiles(self, slice_list):
+		self.confocal_model.generateImageGridFiles(slice_list)
+	
 	def __getSubsChannels(self, slice_list):
 		"""Get the subslices and channels based on the selections made in the slice selection window.
 		"""
