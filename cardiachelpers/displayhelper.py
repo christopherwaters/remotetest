@@ -36,11 +36,12 @@ def segmentRender(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, or
 	septal_transform3 = np.dot((septal_pts[2, :] - origin), np.transpose(transform))
 	# Set up bins as the unique data in all_data_endo third column (the slices)
 	bins = np.unique(all_data_endo[:, 2])
+	print(bins.size)
 	for jz in range(bins.size):
 		# Get the indices that match the current bin and append then append the first value
 		tracing = np.where(all_data_endo[:, 2] == bins[jz])[0]
 		tracing = np.append(tracing, tracing[0])
-		print(tracing)
+		#print(tracing)
 		# Pull x, y, z from endo and epi and plot
 		x = data_endo[tracing, 2]
 		y = data_endo[tracing, 1]
