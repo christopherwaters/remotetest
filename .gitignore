@@ -10,6 +10,7 @@ ehthumbs.db
 __pycache__/
 Test*Data/
 cardiachelper/__pycache__
+Test*Data/*
 
 # Files just in namespace from old work #
 helper.py
