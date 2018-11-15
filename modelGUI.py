@@ -384,7 +384,7 @@ class modelGUI(tk.Frame):
 		time_point = int(self.cine_timepoint_cbox.get())
 		# Plot overall cine segmentation data
 		#print(self.mri_model.cine_endo[time_point].shape)
-		mri_axes = displayhelper.segmentRender(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, self.mri_mesh.origin, self.mri_mesh.transform)
+		mri_axes = displayhelper.segmentRender(self.mri_model.cine_endo_rotate[time_point], self.mri_model.cine_epi_rotate[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, self.mri_mesh.origin, self.mri_mesh.transform)
 		# If desired, plot scar data
 		if self.scar_plot_bool.get() and self.mri_model.scar:
 			mri_axes = displayhelper.displayScarTrace(self.mri_model.aligned_scar[time_point], self.mri_mesh.origin, self.mri_mesh.transform, ax=mri_axes)

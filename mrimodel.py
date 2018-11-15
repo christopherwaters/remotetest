@@ -135,36 +135,44 @@ class MRIModel():
 			endo[i] = endo_time_by_slice
 			epi[i] = epi_time_by_slice
 		
-		self.cine_endo_rotate = [None]*len(endo)
-		self.cine_epi_rotate = [None]*len(epi)
+		cine_endo_rotate = [None]*len(endo)
+		cine_epi_rotate = [None]*len(epi)
 		
-		for time_pt in range(len(self.cine_endo_rotate)):
+		for time_pt in range(len(cine_endo_rotate)):
 			endo_rotate_timepts = [None]*len(endo[time_pt])
 			epi_rotate_timepts = [None]*len(epi[time_pt])
 			for slice_num in range(len(endo_rotate_timepts)):
 				endo_rotate_timepts[slice_num], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(endo[time_pt][slice_num], apex_pt, base_pt, center_septal_pt)
 				epi_rotate_timepts[slice_num], _, self.transform_basis, _ = stackhelper.rotateDataCoordinates(epi[time_pt][slice_num], apex_pt, base_pt, center_septal_pt)
-			self.cine_endo_rotate[time_pt] = endo_rotate_timepts
-			self.cine_epi_rotate[time_pt] = epi_rotate_timepts
+			cine_endo_rotate[time_pt] = endo_rotate_timepts
+			cine_epi_rotate[time_pt] = epi_rotate_timepts
 		self.rv_insertion_pts_rot = stackhelper.rotateDataCoordinates(self.rv_insertion_pts, apex_pt, base_pt, center_septal_pt)[0]
 		self.abs_pts_rot = stackhelper.rotateDataCoordinates(self.apex_base_pts, apex_pt, base_pt, center_septal_pt)[0]
 
 		cine_endo_arrs = [None]*len(endo)
 		cine_epi_arrs = [None]*len(epi)
+		cine_endo_rotate_arrs = [None]*len(cine_endo_rotate)
+		cine_epi_rotate_arrs = [None]*len(cine_epi_rotate)
 		
 		for time_ind, endo_timept in enumerate(endo):
 			epi_timept = epi[time_ind]
+			endo_rotate_timept = cine_endo_rotate[time_ind]
+			epi_rotate_timept = cine_epi_rotate[time_ind]
 			cine_endo_arrs[time_ind] = np.vstack(endo_timept)
+			cine_endo_rotate_arrs[time_ind] = np.vstack(endo_rotate_timept)
 			cine_epi_arrs[time_ind] = np.vstack(epi_timept)
+			cine_epi_rotate_arrs[time_ind] = np.vstack(epi_rotate_timept)
 		
 		#print(cine_endo_arrs[0])
 		# Store class fields based on calculated values:
+		self.cine_endo_rotate = cine_endo_rotate_arrs
+		self.cine_epi_rotate = cine_epi_rotate_arrs
 		self.cine_endo = cine_endo_arrs
 		self.cine_epi = cine_epi_arrs
 		self.cine_apex_pt = self.abs_pts_rot[0]
 		self.cine_basal_pt = self.abs_pts_rot[1]
 		self.cine_septal_pts = self.rv_insertion_pts_rot
-
+		
 		return(True)
 		
 	def importLGE(self):
