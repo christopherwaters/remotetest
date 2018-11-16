@@ -26,8 +26,8 @@ def segmentRender(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, or
 		ax = fig.add_subplot(111, projection='3d')
 	all_data_endo = np.array(all_data_endo).squeeze()
 	all_data_epi = np.array(all_data_epi).squeeze()
-	data_endo = stackhelper.rotateDataCoordinates(all_data_endo, apex_pt, basal_pt, septal_pts)[0]
-	data_epi = stackhelper.rotateDataCoordinates(all_data_epi, apex_pt, basal_pt, septal_pts)[0]
+	data_endo = stackhelper.rotateDataCoordinates(all_data_endo[:, :3], apex_pt, basal_pt, septal_pts)[0]
+	data_epi = stackhelper.rotateDataCoordinates(all_data_epi[:, :3], apex_pt, basal_pt, septal_pts)[0]
 	# Subtract origin and transform data
 	apex_transform = np.dot((apex_pt - origin), np.transpose(transform))
 	basal_transform = np.dot((basal_pt - origin), np.transpose(transform))
@@ -35,21 +35,23 @@ def segmentRender(all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, or
 	septal_transform2 = np.dot((septal_pts[1, :] - origin), np.transpose(transform))
 	septal_transform3 = np.dot((septal_pts[2, :] - origin), np.transpose(transform))
 	# Set up bins as the unique data in all_data_endo third column (the slices)
-	bins = np.unique(all_data_endo[:, 2])
+	bins = np.unique(all_data_endo[:, 3])
 	for jz in range(bins.size):
 		# Get the indices that match the current bin and append then append the first value
-		tracing = np.where(all_data_endo[:, 2] == bins[jz])[0]
-		tracing = np.append(tracing, tracing[0])
+		endo_tracing = np.where(all_data_endo[:, 3] == bins[jz])[0]
+		endo_tracing = np.append(endo_tracing, endo_tracing[0])
 		#print(tracing)
 		# Pull x, y, z from endo and epi and plot
-		x = data_endo[tracing, 2]
-		y = data_endo[tracing, 1]
-		z = data_endo[tracing, 0]
+		x = data_endo[endo_tracing, 2]
+		y = data_endo[endo_tracing, 1]
+		z = data_endo[endo_tracing, 0]
 		ax.plot(x, y, -z, 'y-')
 		# Epi plotting
-		x = data_epi[tracing, 2]
-		y = data_epi[tracing, 1]
-		z = data_epi[tracing, 0]
+		epi_tracing = np.where(all_data_epi[:, 3] == bins[jz])[0]
+		epi_tracing = np.append(epi_tracing, epi_tracing[0])
+		x = data_epi[epi_tracing, 2]
+		y = data_epi[epi_tracing, 1]
+		z = data_epi[epi_tracing, 0]
 		ax.plot(x, y, -z, 'c-')
 	if landmarks:
 		# Plot the apex, basal, and septal points
