@@ -72,8 +72,9 @@ class modelGUI(tk.Frame):
 		ttk.Label(text='SA LGE File:').grid(row=3, sticky='W')
 		ttk.Label(text='LA LGE Files:').grid(row=4, sticky='W')
 		ttk.Label(text='DENSE Files:').grid(row=5, sticky='W')
-		ttk.Label(text='Confocal Directory:').grid(row=6, sticky='W')
-		ttk.Label(text='Premade Mesh File:').grid(row=7, sticky='W')
+		ttk.Label(text='Premade Mesh File:').grid(row=6, sticky='W')
+		ttk.Label(text='Confocal Directory:').grid(row=7, sticky='W')
+		
 		# 	Create entry objects
 		sa_file_entry = ttk.Entry(width=80, textvariable=sa_filename)
 		la_file_entry = ttk.Entry(width=80, textvariable=la_filename)
@@ -88,16 +89,17 @@ class modelGUI(tk.Frame):
 		lge_file_entry.grid(row=3, column=1, columnspan=5)
 		la_lge_file_entry.grid(row=4, column=1, columnspan=5)
 		dense_file_entry.grid(row=5, column=1, columnspan=5)
-		confocal_dir_entry.grid(row=6, column=1, columnspan=5)
-		premade_mesh_entry.grid(row=7, column=1, columnspan=5)
+		premade_mesh_entry.grid(row=6, column=1, columnspan=5)
+		confocal_dir_entry.grid(row=7, column=1, columnspan=5)
+		
 		#	Place "Browse" buttons
 		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(sa_file_entry)).grid(row=1, column=6)
 		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(la_file_entry)).grid(row=2, column=6)
 		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(lge_file_entry)).grid(row=3, column=6)
 		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(la_lge_file_entry, multi='True')).grid(row=4, column=6)
 		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(dense_file_entry, multi='True')).grid(row=5, column=6)
-		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(confocal_dir_entry, multi='Dir')).grid(row=6, column=6)
-		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(premade_mesh_entry)).grid(row=7, column=6)
+		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(premade_mesh_entry)).grid(row=6, column=6)
+		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(confocal_dir_entry, multi='Dir')).grid(row=7, column=6)
 		
 		# Model Options
 		#	Place labels

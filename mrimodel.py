@@ -407,20 +407,15 @@ class MRIModel():
 		cine_endo_prol = [None]*len(self.cine_endo_rotate)
 		cine_epi_prol = [None]*len(self.cine_epi_rotate)
 		
-		for slice_num in range(len(self.cine_endo_rotate)):
-			cine_endo_prol_time = [None]*len(self.cine_endo_rotate[slice_num])
-			cine_epi_prol_time = [None]*len(self.cine_epi_rotate[slice_num])
-			for time_pt in range(len(self.cine_endo_rotate[slice_num])):
-				cine_endo_rot_time = self.cine_endo_rotate[slice_num][time_pt]
-				cine_epi_rot_time = self.cine_epi_rotate[slice_num][time_pt]
-				cine_endo_prol_time[time_pt] = np.column_stack(tuple(mathhelper.cart2prolate(cine_endo_rot_time[:, 0], cine_endo_rot_time[:, 1], cine_endo_rot_time[:, 2], focus)))
-				cine_epi_prol_time[time_pt] = np.column_stack(tuple(mathhelper.cart2prolate(cine_epi_rot_time[:, 0], cine_epi_rot_time[:, 1], cine_epi_rot_time[:, 2], focus)))
-			cine_endo_prol[slice_num] = cine_endo_prol_time
-			cine_epi_prol[slice_num] = cine_epi_prol_time
-			
+		for time_pt in range(len(self.cine_endo_rotate)):
+			cine_endo_rot_time = self.cine_endo_rotate[time_pt]
+			cine_epi_rot_time = self.cine_epi_rotate[time_pt]
+			cine_endo_prol[time_pt] = np.column_stack(tuple(mathhelper.cart2prolate(cine_endo_rot_time[:, 0], cine_endo_rot_time[:, 1], cine_endo_rot_time[:, 2], focus)))
+			cine_epi_prol[time_pt] = np.column_stack(tuple(mathhelper.cart2prolate(cine_epi_rot_time[:, 0], cine_epi_rot_time[:, 1], cine_epi_rot_time[:, 2], focus)))
+		
 		self.cine_endo_prol = cine_endo_prol
 		self.cine_epi_prol = cine_epi_prol
-		
+
 		# Convert Short-Axis LGE endocardial, epicardial, and scar-point traces
 		lge_endo_prol = [None]*len(self.lge_endo_rotate)
 		lge_epi_prol = [None]*len(self.lge_epi_rotate)

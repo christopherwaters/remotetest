@@ -446,6 +446,8 @@ class Mesh():
 		epi_nodes_formatted = np.vstack(tuple(epi_nodes_list))
 		_, m_epi, t_epi = mathhelper.cart2prolate(epi_nodes_formatted[:, 0], epi_nodes_formatted[:, 1], epi_nodes_formatted[:, 2], self.focus)
 		
+		norm_func = lambda x1, x2 : 1
+		
 		transmurality_rbf = sp.interpolate.Rbf(interp_data[:, 0], interp_data[:, 1], interp_data[:, 2], function='multiquadric', smooth=trans_smooth)
 		depth_rbf = sp.interpolate.Rbf(interp_data[non_nan_inds, 0], interp_data[non_nan_inds, 1], interp_data[non_nan_inds, 3], function='multiquadric', smooth=depth_smooth)
 		
