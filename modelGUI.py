@@ -315,7 +315,7 @@ class modelGUI(tk.Frame):
 			self.mri_mesh = mesh.Mesh(num_rings, elem_per_ring, elem_in_wall)
 		
 			# Fit mesh to MRI model data
-			self.mri_mesh.fitContours(self.mri_model.cine_endo[time_point], self.mri_model.cine_epi[time_point], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, mesh_type_cbox.get())
+			self.mri_mesh.fitContours(self.mri_model.cine_endo[time_point][:, :3], self.mri_model.cine_epi[time_point][:, :3], self.mri_model.cine_apex_pt, self.mri_model.cine_basal_pt, self.mri_model.cine_septal_pts, mesh_type_cbox.get())
 			self.mri_mesh.feMeshRender()
 			self.mri_mesh.nodeNum(self.mri_mesh.meshCart[0], self.mri_mesh.meshCart[1], self.mri_mesh.meshCart[2])
 			self.mri_mesh.getElemConMatrix()

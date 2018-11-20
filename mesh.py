@@ -82,6 +82,7 @@ class Mesh():
 		self.focus = lv_geom['focus']
 		self.num_rings, self.elem_per_ring, self.elem_in_wall = lv_geom['LVLCR']
 		self.epi_node_list = np.subtract(lv_geom['eEPI'], 1)
+		print(type(self.epi_node_list))
 		self.epi_nodes = self.hex[self.epi_node_list, :][:, [2, 3, 6, 7]]
 		return(True)
 	
@@ -314,6 +315,9 @@ class Mesh():
 		self.hex = hex
 		self.pent = pent
 		
+		self.epi_node_list = np.array(range(int(hex.shape[0] - (hex.shape[0] / self.elem_in_wall)), int(hex.shape[0])))
+		self.epi_nodes = self.hex[self.epi_node_list, :][:, [2, 3, 6, 7]]
+		
 		return([hex, pent])
 	
 	def assignScarElems(self, scar_contour, conn_mat='hex'):
@@ -486,9 +490,9 @@ class Mesh():
 			for wh in range(outer_scar.size):
 				for by in range(int(through_wall_scar[wh])):
 					scar_elems = np.append(scar_elems, outer_scar[wh] - elem_per_layer*by)
+		scar_elems = scar_elems.astype(int)
 		self.elems_in_scar = scar_elems
-		#self.nodes_in_scar = np.unique(self.hex[scar_elems, :].flatten())
-		#print(self.nodes_in_scar)
+		self.nodes_in_scar = np.unique(self.hex[scar_elems, :].flatten())
 		return(scar_elems)
 	
 	def getElemData(self, elem_list, data_out, average=True, timepoint=0):
