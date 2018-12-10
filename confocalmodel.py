@@ -19,6 +19,7 @@ import matplotlib.pyplot as mplt
 import glob
 from PIL import Image
 import os
+from natsort import natsorted, ns
 from cardiachelpers import importhelper
 from cardiachelpers import confocalhelper
 
@@ -95,7 +96,7 @@ class ConfocalSlice():
 		self.slice_name = os.path.split(confocal_dir)[1]
 		
 		# Record filenames for all tiff image files in the directory.
-		self.tif_files = sorted(glob.glob(os.path.join(confocal_dir, '*.tif')).copy())
+		self.tif_files = natsorted(glob.glob(os.path.join(confocal_dir, '*.tif')).copy(), alg=ns.IC)
 		self.raw_images = [None]*len(self.tif_files)
 		
 		# Iterate through and create image objects for each tiff file

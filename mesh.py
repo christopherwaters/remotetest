@@ -75,38 +75,63 @@ class Mesh():
 	def importPremadeMesh(self, mesh_file):
 		"""A modified version of the mesh to allow importing premade mesh structures.
 		"""
-		lv_geom = importhelper.loadmat(mesh_file)['LVGEOM']
-		self.hex = np.subtract(np.array(lv_geom['eHEX']), 1)
-		self.pent = np.subtract(np.array(lv_geom['ePENT']), 1)
-		self.nodes = np.array(lv_geom['nXYZ'])
-		self.focus = lv_geom['focus']
-		self.num_rings, self.elem_per_ring, self.elem_in_wall = lv_geom['LVLCR']
-		self.epi_node_list = np.subtract(lv_geom['eEPI'], 1)
-		print(type(self.epi_node_list))
-		self.epi_nodes = self.hex[self.epi_node_list, :][:, [2, 3, 6, 7]]
-		return(True)
+		try:
+			# Pull data from the .mat premade mesh file
+			lv_geom = importhelper.loadmat(mesh_file)['LVGEOM']
+			# Correct for indexing differences between MATLAB and Python
+			self.hex = np.subtract(np.array(lv_geom['eHEX']), 1)
+			self.pent = np.subtract(np.array(lv_geom['ePENT']), 1)
+			# Pull mesh-centric information
+			self.nodes = np.array(lv_geom['nXYZ'])
+			self.focus = lv_geom['focus']
+			self.num_rings, self.elem_per_ring, self.elem_in_wall = lv_geom['LVLCR']
+			self.epi_node_list = np.subtract(lv_geom['eEPI'], 1)
+			self.epi_nodes = self.hex[self.epi_node_list, :][:, [2, 3, 6, 7]]
+			epi_node_fitting = self.nodes[np.unique(self.epi_nodes.flatten()), :]
+			# Interpret the epicardial and endocardial node matrix surface
+			num_nodes_per_layer = np.unique(self.epi_nodes.flatten()).shape[0]
+			start_nodes = [layer_num * (num_nodes_per_layer + 1) for layer_num in range(self.elem_in_wall+2)]
+			nodes_by_layer = [list(range(start_nodes[i], start_nodes[i+1])) for i in range(len(start_nodes)-1)]
+			endo_node_fitting = self.nodes[nodes_by_layer[2], :]
+			# Recreate node matrices using bicubic fitting method
+			self.epi_node_matrix, _ = meshhelper.fitBicubicData(epi_node_fitting, self.focus, mesh_density='4x8')
+			self.endo_node_matrix, _ = meshhelper.fitBicubicData(endo_node_fitting, self.focus, mesh_density='4x8')
+			return(True)
+		except FileNotFoundError:
+			print('Premade mesh file not found.')
+			return(False)
 	
 	def assignInsertionPts(self, apex_pt, basal_pt, septal_pts):
+		"""Set the internal transform array from user-defined points to align geometry.
+		"""
+		# Define a local norm calculation function.
 		calcNorm = lambda arr_in: np.sqrt(np.sum(np.square(arr_in)))
 		
+		# Calculate the e1 basis from the apical and basal points.
 		c = apex_pt - basal_pt
 		c_norm = calcNorm(c)
 		self.origin = basal_pt + c/3
 		e1_basis = [c1 / c_norm for c1 in c]
 		
+		# Define the e2 basis from the septal points.
 		d1 = septal_pts[0, :] - self.origin
 		d2 = d1 - [np.dot(d1, e1_basis)*e1_elem for e1_elem in e1_basis]
 		e2_basis = d2 / calcNorm(d2)
 		
+		# Calculate the e3 basis from the other 2 bases.
 		e3 = np.cross(e1_basis, e2_basis)
 		e3_basis = e3 / calcNorm(e3)
 		
+		# Set up the transform.
 		self.transform = np.array([e1_basis, e2_basis, e3_basis])
 		return(True)
 	
 	def rotateNodesProlate(self):
+		"""Rotates the nodes into prolate spheroidal coordinates.
+		"""
 		nodes_prol_list = mathhelper.cart2prolate(self.nodes[:, 0], self.nodes[:, 1], self.nodes[:, 2], self.focus)
 		self.nodes_prol = np.column_stack(tuple(nodes_prol_list))
+		return(self.nodes_prol)
 	
 	def fitContours(self, all_data_endo, all_data_epi, apex_pt, basal_pt, septal_pts, mesh_type):
 		"""Function to Perform the Contour Fitting from the Passed Endo and Epi Contour data.

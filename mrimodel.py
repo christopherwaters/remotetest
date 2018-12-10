@@ -124,6 +124,7 @@ class MRIModel():
 		endo = [None]*time_pts.size
 		epi = [None]*time_pts.size
 		
+		# Format endo and epi contour points
 		for i, time_pt in enumerate(time_pts):
 			endo_by_time = endo_stack[np.where(endo_stack[:, 3] == time_pt)[0], :]
 			epi_by_time = epi_stack[np.where(epi_stack[:, 3] == time_pt)[0], :]
@@ -142,6 +143,7 @@ class MRIModel():
 		cine_endo_rotate = [None]*len(endo)
 		cine_epi_rotate = [None]*len(epi)
 		
+		# Rotate endo and epicardial points and reformat the rotated points.
 		for time_pt in range(len(cine_endo_rotate)):
 			endo_rotate_timepts = [None]*len(endo[time_pt])
 			epi_rotate_timepts = [None]*len(epi[time_pt])
@@ -160,6 +162,7 @@ class MRIModel():
 		cine_endo_rotate_arrs = [None]*len(cine_endo_rotate)
 		cine_epi_rotate_arrs = [None]*len(cine_epi_rotate)
 		
+		# Establish list of arrays to format
 		for time_ind, endo_timept in enumerate(endo):
 			epi_timept = epi[time_ind]
 			endo_rotate_timept = cine_endo_rotate[time_ind]
@@ -169,7 +172,6 @@ class MRIModel():
 			cine_epi_arrs[time_ind] = np.vstack(epi_timept)
 			cine_epi_rotate_arrs[time_ind] = np.vstack(epi_rotate_timept)
 
-		#print(cine_endo_arrs[0])
 		# Store class fields based on calculated values:
 		self.cine_endo_rotate = cine_endo_rotate_arrs
 		self.cine_epi_rotate = cine_epi_rotate_arrs
@@ -273,6 +275,7 @@ class MRIModel():
 		base_pt = self.apex_base_pts[1, :]
 		center_septal_pt = np.expand_dims(self.rv_insertion_pts[2, :], 0)
 		
+		# Rotate and save long-axis lge contours
 		for slice_num in range(len(self.la_scar_files)):
 			scar_endo = scar_la_endo[slice_num][:, :3]
 			scar_epi = scar_la_epi[slice_num][:, :3]
@@ -375,17 +378,22 @@ class MRIModel():
 	def alignScar(self, timepoint=0):
 		"""Scar alignment designed to include long-axis scar data.
 		"""
+		# Interpolate the scar contours circumferentially using 50 evenly-spaced angle bins
 		self.interp_epi_surf, self.wall_scar = stackhelper.interpShortScar(50, self.lge_epi_prol, self.lge_endo_prol, self.lge_pts_prol, self.lge_epi_rotate, self.lge_endo_rotate, self.lge_pts_rotate)
+		# Remove nan values from the list of scar transmuralities
 		for slice_num in range(len(self.wall_scar)):
 			temp_slice = self.wall_scar[slice_num]
 			temp_slice[np.isnan(temp_slice[:, 1]), 1] = 0
 			self.wall_scar[slice_num] = temp_slice
+		# Interpolate scar contours based on the long-axis LGE contours
 		self.interp_epi_la_surf, self.wall_scar_la = stackhelper.interpLongScar(20, self.lge_la_epi_prol, self.lge_la_endo_prol, self.lge_la_pts_prol, self.lge_la_epi_rotate, self.lge_la_endo_rotate, self.lge_la_pts_rotate)
+		# Remove nan values from the list of long-axis LGE transmuralities
 		for slice_num in range(len(self.wall_scar_la)):
 			temp_slice = self.wall_scar_la[slice_num]
 			temp_slice[np.isnan(temp_slice[:, 1]), 1] = 0
 			self.wall_scar_la[slice_num] = temp_slice
 		temp_data_arr = np.empty([0, 6])
+		# Stack the slices into single arrays
 		for slice_num in range(len(self.wall_scar)):
 			temp_slice_arr = np.column_stack((self.interp_epi_surf[slice_num], self.wall_scar[slice_num]))
 			temp_data_arr = np.vstack((temp_data_arr, temp_slice_arr))

@@ -638,8 +638,6 @@ def fitBicubicData(data, focus, mesh_density='4x2', smooth=True, constraints=Tru
 	nodal_mesh = nodal_mesh[nodal_mesh[:, 1].argsort(kind='mergesort')]
 	nodal_mesh = nodal_mesh[nodal_mesh[:, 2].argsort(kind='mergesort')]
 	
-	print(unsorted_nodal_mesh_deg)
-	
 	# Get Sizes
 	m = nodal_mesh.shape[0]
 	size_nodal_nu = np.where(nodal_mesh[:, 2] == 0)[0].size
