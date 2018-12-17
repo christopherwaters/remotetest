@@ -17,6 +17,7 @@ import mesh
 import numpy as np
 from cardiachelpers import displayhelper
 import math
+import winreg, glob, os
 
 class modelGUI(tk.Frame):
 	"""Generates a GUI to control the Python-based cardiac modeling toolbox.
@@ -25,6 +26,7 @@ class modelGUI(tk.Frame):
 	def __init__(self, master=None):
 		tk.Frame.__init__(self, master)
 		self.grid()
+		self.identifyPostView()
 		self.createWidgets()
 		self.scar_assign = False
 		self.dense_assign = False
@@ -48,6 +50,16 @@ class modelGUI(tk.Frame):
 		
 		self.master = master
 
+	def identifyPostView(self):
+		try:
+			postview_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\University of Utah\\PostView")
+			postview_folder = winreg.QueryValueEx(postview_key, "Location")[0]
+			os.chdir(postview_folder)
+			postview_exe_file = glob.glob('P*.exe')[0]
+			self.postview_exe = os.path.join(postview_folder, postview_exe_file)
+		except FileNotFoundError:
+			self.postview_exe = ''
+		
 	def createWidgets(self):
 		"""Place widgets throughout GUI frame and assign functionality.
 		"""
@@ -171,16 +183,21 @@ class modelGUI(tk.Frame):
 		postview_label = ttk.Label(text='Postview Options')
 		postview_label.grid(row=10, column=2, columnspan=7)
 		ttk.Label(text='Postview filename:').grid(row=11, column=2, sticky='W')
+		ttk.Label(text='Postview installation:').grid(row=12, column=2, sticky='W')
 		#	Create entry objects
 		self.postview_file_entry = ttk.Entry()
+		self.postview_exe_entry = ttk.Entry()
 		self.postview_file_entry.grid(row=11, column=3, columnspan=5, sticky='WE')
+		self.postview_exe_entry.grid(row=12, column=3, columnspan=5, sticky='WE')
+		self.postview_exe_entry.insert(0, self.postview_exe)
 		#	Buttons to create and open files
 		self.feb_file_button = ttk.Button(text='Generate FEBio File', state='disabled', command= lambda: self.genFebFile())
 		self.postview_open_button = ttk.Button(text='Launch PostView', state='disabled', command= lambda: self.openPostview())
-		self.feb_file_button.grid(row=12, column=3)
-		self.postview_open_button.grid(row=12, column=4)
+		self.feb_file_button.grid(row=13, column=3)
+		self.postview_open_button.grid(row=13, column=4)
 		#	Create "Browse" button
 		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(self.postview_file_entry, multi='Feb')).grid(row=11, column=8, sticky='W')
+		ttk.Button(text='Browse', command= lambda: self.openFileBrowser(self.postview_exe_entry, multi='Exe')).grid(row=12, column=8, sticky='W')
 		
 		# Plot Options
 		#	Place labels
@@ -354,15 +371,23 @@ class modelGUI(tk.Frame):
 					self.dense_fe_button.configure(state='disabled')
 	
 	def createConfocalModel(self, confocal_dir_entry):
+		"""Set up a new confocalModel object of stitched images.
+		
+		Models contain ConfocalSlice objects, which are defined within the confocalModel file.
+		"""
+		# Establish the directory of interest in the model.
 		confocal_dir = confocal_dir_entry.get()
 		if confocal_dir == '':
 			messagebox.showinfo('No Directory', 'Please select a directory for confocal images.')
 			return(False)
+		# Instantiate a new model object
 		self.confocal_model = confocalmodel.ConfocalModel(confocal_dir)
 		self.confocal_slice_selections = {}
+		# Create a local variable to track slices in the confocalmodel object.
 		for slice_name in self.confocal_model.slice_names:
 			self.confocal_slice_selections[slice_name] = tk.IntVar(value=1)
 			self.confocal_slice_menu.add_checkbutton(label=slice_name, variable=self.confocal_slice_selections[slice_name], onvalue=1, offvalue=0)
+		# Enable GUI elements that require an instantiated confocalModel object.
 		self.confocal_slice_button.configure(state='enabled')
 	
 	def cineTimeChanged(self):
@@ -434,6 +459,10 @@ class modelGUI(tk.Frame):
 			self.scar_dense_button.configure(state='normal')
 	
 	def scarDense(self):
+		"""Function designed to calculate regional DENSE data based on model / mesh scar extent.
+		
+		Calculates DENSE data in the identified scar and non-scar (remote) regions and reports / plots those values.
+		"""
 		scar_average_dense = [None]*len(self.mri_model.dense_aligned_displacement)
 		remote_average_dense = [None]*len(self.mri_model.dense_aligned_displacement)
 		for time_point in range(len(self.mri_model.dense_aligned_displacement)):
@@ -464,9 +493,12 @@ class modelGUI(tk.Frame):
 		
 	def openPostview(self):
 		"""Launch a PostView instance pointed at the FEBio File
+		
+		Note for this function to operate as expected, the function displayhelper/displayMeshPostview must point to the FEBio PostView executable on your machine.
 		"""
 		# Pull FEBio file name
 		feb_file_name = self.postview_file_entry.get()
+		feb_executable = self.postview_exe_entry.get()
 		# Check that file is an accessible file
 		try:
 			open(feb_file_name)
@@ -478,7 +510,12 @@ class modelGUI(tk.Frame):
 			messagebox.showinfo('File Warning', 'File selected is not an FEBio file. Check file name and try again.')
 			return(False)
 		# Request PostView Launch
-		displayhelper.displayMeshPostview(feb_file_name)
+		try:
+			open(feb_executable)
+			displayhelper.displayMeshPostview(feb_file_name, feb_executable)
+		except FileNotFoundError:
+			messagebox.showinfo('Executable Warning', 'PostView installation not found. Please identify executable location.')
+			return(False)
 	
 	def startStitching(self):
 		"""Stitch selected slices into a large, combined image and save.

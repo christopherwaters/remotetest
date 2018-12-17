@@ -254,10 +254,12 @@ def nodeRender(nodes, ax=None):
 	ax.scatter(x, y, -z)
 	return(ax)
 	
-def displayMeshPostview(file_name):
+def displayMeshPostview(file_name, executable_name):
 	"""Launch PostView with specific file selected.
+	
+	The string for the subprocess must point to your installation of PostView.
 	"""
-	p = subprocess.Popen(['C://Program Files/postview-2.3/PostView2.exe', file_name])
+	p = subprocess.Popen([executable_name, file_name])
 	return(p)
 	
 def plotListData(input_list, title_list, ax=None):
