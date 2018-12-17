@@ -35,7 +35,8 @@ class ConfocalModel():
 		"""
 		
 		# Get all TIFF files in the directory
-		dirs = [(top_dir + '/' + sub_dir) for sub_dir in os.listdir(top_dir) if os.path.isdir(top_dir + '/' + sub_dir)]
+		dirs = natsorted([(top_dir + '/' + sub_dir) for sub_dir in os.listdir(top_dir) if os.path.isdir(top_dir + '/' + sub_dir)], alg=ns.IC)
+		print(dirs)
 		self.top_dir = top_dir
 		self.slices = [ConfocalSlice(im_dir) for im_dir in dirs]
 		self.slice_names = [confocal_slice.slice_name for confocal_slice in self.slices]
